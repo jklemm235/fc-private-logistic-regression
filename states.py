@@ -9,7 +9,7 @@ This demo implementation works as follows:
 
 
 
-from FeatureCloud.app.engine.app import AppState, app_state, Role
+from FeatureCloud.app.engine.app import AppState, app_state, Role, LogLevel
 import algo
 
 import os
@@ -29,15 +29,18 @@ class InitialState(AppState):
     Loads in data to the AppState as well as necessary hyperparameters from config.yaml
     """
     def register(self):
-        self.register_transition("local_computation", role.BOTH)
+        self.register_transition("local_computation", Role.BOTH)
 
     def run(self):
         # load in config self.internal["epsilon", "delta", ...]
+        #TODO: remove this
+        self.log("Init fc-private-logistic-regression start", level = LogLevel.DEBUG)
+        print("Inital state start")
         try:
             with open("config.yaml", 'r') as stream:
                 config = yaml.safe_load(stream)
         except:
-            self.log("Error loading config.yaml" , LogLevel = LogLevel.FATAL)
+            self.log("Error loading config.yaml" , level = LogLevel.FATAL)
 
         self.store(key = "config", value = config)
 
@@ -64,11 +67,13 @@ class InitialState(AppState):
         if self.is_coordinator:
             self.store(key = "cur_communication_round", value = 0)
 
+        self.log("Init fc-private-logistic-regression end", level = LogLevel.DEBUG)
+
 @app_state("local_computation")
 class localComputationState(AppState):
 
     def register(self):
-        self.register_transition("aggregate_data", roles.COORDINATOR)
+        self.register_transition("aggregate_data", Role.COORDINATOR)
 
     def run(self):
         random.seed(10) #TODO: remove this
@@ -96,7 +101,7 @@ class localComputationState(AppState):
         #TODO: manage if called from aggregate data
         weights, cost =  algo.SGD(X, y, weights, alpha, max_iter, lambda_)
         if not weights:
-            self.log("Error in Gradient descent, no data returned" , LogLevel = LogLevel.FATAL)
+            self.log("Error in Gradient descent, no data returned" , level = LogLevel.FATAL)
         self.store(key = "weights", value = weights)
         if self.is_coordinator:
             #TODO: add dp noise here possibly
@@ -111,8 +116,8 @@ class localComputationState(AppState):
 class aggregateDataState(AppState):
 
     def register(self):
-        self.register_transition("local_computation", roles.COORDINATOR)
-        self.register_transition("terminal", roles.COORDINATOR)
+        self.register_transition("local_computation", Role.COORDINATOR)
+        self.register_transition("terminal", Role.COORDINATOR)
 
     def run(self):
         # TODO: how to manage coordinator adding noise, best add func in template
