@@ -37,16 +37,27 @@ class InitialState(AppState):
         self.log("Init fc-private-logistic-regression start", level = LogLevel.DEBUG)
         print("Inital state start")
         try:
-            with open("config.yaml", 'r') as stream:
+            #print(os.listdir(os.getcwd()))
+            #print('Home contains:')
+            #print(os.listdir(
+            #    os.path.join(os.getcwd(), "home")))
+            #print('mnt/input contains:')
+            #print(os.listdir(
+            #    os.path.join(os.getcwd(), "mnt", "input")))
+            #TODO: remove prints
+            with open(os.path.join(os.getcwd(), "mnt", "input", "config.yaml"), 'r') as stream:
                 config = yaml.safe_load(stream)
-        except:
-            self.log("Error loading config.yaml" , level = LogLevel.FATAL)
+                #TODO: fix open to work without the hack of copying everything to
+                # data
+        except Exception as err:
+            self.log(f"Error loading config.yaml: f{err}" , level = LogLevel.FATAL)
 
         self.store(key = "config", value = config)
 
         # load in data in self.internal["data"]
-        train_data = pd.read_csv(os.path.join("data", "training_set.csv"), index_col=0)
-        test_data = pd.read_csv(os.path.join("data", "test_set.csv"), index_col=0)
+        #TODO: fix so it always loads data correctly when it is known how docker works
+        train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_set.csv"), index_col=0)
+        test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_set.csv"), index_col=0)
 
         X_train = np.array(train_data.drop(columns=['label']))
         X = np.array(X_train)
@@ -62,18 +73,35 @@ class InitialState(AppState):
         # load in weights and other parameters
         n, d = X.shape
         self.store(key = "n", value = n)
-        self.store(key = "d", value = d)
-        self.store(key = "weights", value = None)
+        self.store(key = "d", value = d) #TODO: works if just one row in predictions
+                # are there models that predict n values and therefore n cols?
+        self.store(key = "weights", value = np.ones(d))
         if self.is_coordinator:
             self.store(key = "cur_communication_round", value = 0)
 
         self.log("Init fc-private-logistic-regression end", level = LogLevel.DEBUG)
+        #TODO add first computation here
+        return "local_computation"
+
+@app_state("obtain_weights")
+class obtainWeights(AppState):
+
+    def register(self):
+        self.register_transition("local_computation", Role.BOTH)
+
+    def run(self):
+        # update from broadcast_data
+        self.store(key = "weights", value = self.await_data(
+                                        n = 1, unwrap=True, is_json=False))
+        print("obtained weights: {}".format(self.load("weights")))
+        return "local_computation"
 
 @app_state("local_computation")
 class localComputationState(AppState):
 
     def register(self):
         self.register_transition("aggregate_data", Role.COORDINATOR)
+        self.register_transition("obtain_weights", Role.PARTICIPANT)
 
     def run(self):
         random.seed(10) #TODO: remove this
@@ -90,25 +118,25 @@ class localComputationState(AppState):
         C = self.load("config")["dpsgd"]["C"]
         sigma = self.load("config")["dpsgd"]["sigma"]
         delta = self.load("config")["dpsgd"]["delta"]
-
         weights = self.load("weights")
-        if not weights:
-            weights = np.ones(d)
-        else:
-            weights = self.await_data(n = 1, unwrap=True, is_json=False)
+
+
 
         "Train Logistic regression with SGD"
-        #TODO: manage if called from aggregate data
         weights, cost =  algo.SGD(X, y, weights, alpha, max_iter, lambda_)
-        if not weights:
-            self.log("Error in Gradient descent, no data returned" , level = LogLevel.FATAL)
+        print("locally updated weights: {}".format(weights)) #TODO: rmv
+        # local update
         self.store(key = "weights", value = weights)
         if self.is_coordinator:
             #TODO: add dp noise here possibly
             self.send_data_to_coordinator(weights, send_to_self = True, use_smpc = False)
+            return "aggregate_data"
         else:
             self.send_data_to_coordinator(weights, send_to_self = False, use_smpc = False)
-        return "aggregate_data"
+            #TODO: possibly an infinite loop here? Or does the coordinator
+            # finnishing also terminate every client?
+            return "obtain_weights"
+
 
 
 
@@ -116,24 +144,28 @@ class localComputationState(AppState):
 class aggregateDataState(AppState):
 
     def register(self):
-        self.register_transition("local_computation", Role.COORDINATOR)
+        self.register_transition("obtain_weights", Role.COORDINATOR)
         self.register_transition("terminal", Role.COORDINATOR)
 
     def run(self):
         # TODO: how to manage coordinator adding noise, best add func in template
         weights_updated = self.aggregate_data(use_smpc=False)
+        print("aggregated weights:") #TODO: remove prints
+        print(weights_updated) #TODO rmv
         cur_comm = self.load("cur_communication_round") + 1
         self.store(key = "cur_communication_round",
                         value = cur_comm)
-        if cur_comm >= self.load("config")["dpsgd"]["communication_rounds"]:
+        if cur_comm > self.load("config")["dpsgd"]["communication_rounds"]:
             # finnished
             #TODO: safe result in file?
             print("Done:")  #TODO: remove these lines
-            print(weights)
-            print(analyse_and_plot())
+            print(weights_updated) #TODO rmv
             return "terminal"
         else:
             # send data to clients
-                broadcast_data(weights_updated, send_to_self = False)
+            self.broadcast_data(weights_updated, send_to_self = True)
+            #TODO: careful, send_to_self just means the instance adds the weights
+            # to its own incoming vector
+            return "obtain_weights"
 
 
