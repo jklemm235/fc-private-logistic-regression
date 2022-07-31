@@ -47,6 +47,7 @@ class InitialState(AppState):
             #TODO: remove prints
             with open(os.path.join(os.getcwd(), "mnt", "input", "config.yaml"), 'r') as stream:
                 config = yaml.safe_load(stream)
+                print(config) #TODO: rmv
                 #TODO: fix open to work without the hack of copying everything to
                 # data
         except Exception as err:
@@ -62,8 +63,7 @@ class InitialState(AppState):
         X_train = np.array(train_data.drop(columns=['label']))
         X = np.array(X_train)
         y_train = np.array(train_data['label'])
-        self.store(key = "X", value = X)
-        self.store(key = "y_train", value = y_train)
+        # not put in dict yet, they will be modified first by the LogisticRegression_DPSGD class
 
         X_test = np.array(test_data.drop(columns=['label']))
         y_test = np.array(test_data['label'])
@@ -75,10 +75,41 @@ class InitialState(AppState):
         self.store(key = "n", value = n)
         self.store(key = "d", value = d) #TODO: works if just one row in predictions
                 # are there models that predict n values and therefore n cols?
-        self.store(key = "weights", value = np.ones(d))
         if self.is_coordinator:
             self.store(key = "cur_communication_round", value = 0)
 
+
+        # DP information
+        #TODO: also other DP modes
+        if "dpSgd" in config["dpMode"]:
+            withDPSGD = True
+        else:
+            withDPSGD = False
+
+        # SGD Class creation
+        try:
+            alpha = config["sgdOptions"]["alpha"]
+            max_iter = config["sgdOptions"]["max_iter"]
+            lambda_ = config["sgdOptions"]["lambda_"]
+            tolerance = config["sgdOptions"]["tolerance"]
+            L = config["sgdOptions"]["L"]
+            C = config["sgdOptions"]["C"]
+            sigma = config["sgdOptions"]["sigma"]
+            #TODO: theta should be read in here
+        except Exception as err:
+            self.log(f"Config file seems to miss fields: {err}")
+
+        DPSGD_class = algo.LogisticRegression_DPSGD(alpha=alpha, max_iter=max_iter,
+                                    lambda_=lambda_, tolerance = tolerance,
+                                    DP = withDPSGD, L=L, C=C, sigma=sigma, theta =  None)
+        # TODO fix theta, should be in config file
+        X, y_train = DPSGD_class.init_theta(X, y_train)
+        self.store(key = "X", value = X)
+        self.store(key = "y_train", value = y_train)
+
+        #TODO: change sigma to epsilon + delta and calc sigma, also change config.yaml accordingly
+        print(vars(DPSGD_class))
+        self.store(key="DPSGD_class", value = DPSGD_class)
         self.log("Init fc-private-logistic-regression end", level = LogLevel.DEBUG)
         #TODO add first computation here
         return "local_computation"
@@ -91,9 +122,11 @@ class obtainWeights(AppState):
 
     def run(self):
         # update from broadcast_data
-        self.store(key = "weights", value = self.await_data(
-                                        n = 1, unwrap=True, is_json=False))
-        print("obtained weights: {}".format(self.load("weights")))
+        DPSGD_class = self.load("DPSGD_class")
+        DPSGD_class.theta = self.await_data(n = 1, unwrap=True, is_json=False)
+        self.store(key="DPSGD_class", value = DPSGD_class)
+        print(vars(DPSGD_class))
+        print("obtained weights: {}".format(DPSGD_class.theta))
         return "local_computation"
 
 @app_state("local_computation")
@@ -111,28 +144,19 @@ class localComputationState(AppState):
         n = self.load("n")
         d = self.load("d")
 
-        max_iter = self.load("config")["dpsgd"]["max_iter"]
-        alpha = self.load("config")["dpsgd"]["alpha"]
-        lambda_ = self.load("config")["dpsgd"]["lambda_"]
-        L = self.load("config")["dpsgd"]["L"]
-        C = self.load("config")["dpsgd"]["C"]
-        sigma = self.load("config")["dpsgd"]["sigma"]
-        delta = self.load("config")["dpsgd"]["delta"]
-        weights = self.load("weights")
-
-
-
         "Train Logistic regression with SGD"
-        weights, cost =  algo.SGD(X, y, weights, alpha, max_iter, lambda_)
-        print("locally updated weights: {}".format(weights)) #TODO: rmv
+        DPSGD_class = self.load("DPSGD_class")
+        DPSGD_class.train(X, y)
+        self.store(key="DPSGD_class", value = DPSGD_class)
+        print("Local Training finished, updated class is:") #TODO rmv
+        print(vars(DPSGD_class)) #TODO rmv
         # local update
-        self.store(key = "weights", value = weights)
         if self.is_coordinator:
             #TODO: add dp noise here possibly
-            self.send_data_to_coordinator(weights, send_to_self = True, use_smpc = False)
+            self.send_data_to_coordinator(DPSGD_class.theta, send_to_self = True, use_smpc = False)
             return "aggregate_data"
         else:
-            self.send_data_to_coordinator(weights, send_to_self = False, use_smpc = False)
+            self.send_data_to_coordinator(DPSGD_class.theta, send_to_self = False, use_smpc = False)
             #TODO: possibly an infinite loop here? Or does the coordinator
             # finnishing also terminate every client?
             return "obtain_weights"
@@ -155,7 +179,9 @@ class aggregateDataState(AppState):
         cur_comm = self.load("cur_communication_round") + 1
         self.store(key = "cur_communication_round",
                         value = cur_comm)
-        if cur_comm > self.load("config")["dpsgd"]["communication_rounds"]:
+        print("cur_comm is {}".format(cur_comm))
+        print("max_comm is {}".format(self.load("config")["communication_rounds"]))
+        if cur_comm > self.load("config")["communication_rounds"]:
             # finnished
             #TODO: safe result in file?
             print("Done:")  #TODO: remove these lines

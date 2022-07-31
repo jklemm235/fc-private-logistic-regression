@@ -1,9 +1,0 @@
-dpsgd:
-    communication_rounds: 1 # number of times the local models get aggregated and then broadcasted
-    max_iter  : 100 # number of iterations for the local SGD per communication rounds
-    alpha: 0.01 # learning rate
-    lambda_: 0 # Regularization parameter lambda
-    L: 10 #Lot size in DPSGD
-    C: 1 # norm bound
-    sigma: 1 # noise scale
-    delta: 0.00001
