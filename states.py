@@ -63,6 +63,9 @@ class InitialState(AppState):
         X_train = np.array(train_data.drop(columns=['label']))
         X = np.array(X_train)
         y_train = np.array(train_data['label'])
+        print("Shape of loaded data is:") #TODO: rmv
+        print(X.shape) #TODO: rmv
+        print(y_train.shape) #TODO: rmv
         # not put in dict yet, they will be modified first by the LogisticRegression_DPSGD class
 
         X_test = np.array(test_data.drop(columns=['label']))
@@ -103,15 +106,18 @@ class InitialState(AppState):
                                     lambda_=lambda_, tolerance = tolerance,
                                     DP = withDPSGD, L=L, C=C, sigma=sigma, theta =  None)
         # TODO fix theta, should be in config file
+        print("Shape of X and y_train and theta before storing") #TODO; rmv
         X, y_train = DPSGD_class.init_theta(X, y_train)
+        print(X.shape) #TODO rmbv
+        print(y_train.shape) #TODO rmbv
+        print(DPSGD_class.theta.shape) #TODO: rmv
         self.store(key = "X", value = X)
         self.store(key = "y_train", value = y_train)
 
         #TODO: change sigma to epsilon + delta and calc sigma, also change config.yaml accordingly
-        print(vars(DPSGD_class))
+        print(vars(DPSGD_class)) #TODO: rmv
         self.store(key="DPSGD_class", value = DPSGD_class)
-        self.log("Init fc-private-logistic-regression end", level = LogLevel.DEBUG)
-        #TODO add first computation here
+        self.log("Init fc-private-logistic-regression end", level = LogLevel.DEBUG) #TODO: rmv
         return "local_computation"
 
 @app_state("obtain_weights")
@@ -146,10 +152,14 @@ class localComputationState(AppState):
 
         "Train Logistic regression with SGD"
         DPSGD_class = self.load("DPSGD_class")
+        print("Training with the following shaped data:") #TODO rmv
+        print(X.shape)
+        print(y.shape)
         DPSGD_class.train(X, y)
         self.store(key="DPSGD_class", value = DPSGD_class)
         print("Local Training finished, updated class is:") #TODO rmv
         print(vars(DPSGD_class)) #TODO rmv
+        print(DPSGD_class.theta.shape) #TODO: rmv
         # local update
         if self.is_coordinator:
             #TODO: add dp noise here possibly
@@ -174,6 +184,7 @@ class aggregateDataState(AppState):
     def run(self):
         # TODO: how to manage coordinator adding noise, best add func in template
         weights_updated = self.aggregate_data(use_smpc=False)
+        print(weights_updated.shape) #TODO rmv
         print("aggregated weights:") #TODO: remove prints
         print(weights_updated) #TODO rmv
         cur_comm = self.load("cur_communication_round") + 1
@@ -181,11 +192,19 @@ class aggregateDataState(AppState):
                         value = cur_comm)
         print("cur_comm is {}".format(cur_comm))
         print("max_comm is {}".format(self.load("config")["communication_rounds"]))
-        if cur_comm > self.load("config")["communication_rounds"]:
+        if cur_comm >= self.load("config")["communication_rounds"]:
             # finnished
             #TODO: safe result in file?
             print("Done:")  #TODO: remove these lines
             print(weights_updated) #TODO rmv
+            print(weights_updated.shape)
+            print("Shape of test data to be evaluated:") #TODO: rmv
+            print(self.load("X_test").shape) #TODO: rmv
+            print(self.load("y_test").shape) #TODO: rmv
+            #TODO send data to itself for adding dp necessary
+            DPSGD_class = self.load("DPSGD_class")
+            DPSGD_class.theta = weights_updated
+            DPSGD_class.evaluate(X = self.load("X_test"), y = self.load("y_test"))
             return "terminal"
         else:
             # send data to clients

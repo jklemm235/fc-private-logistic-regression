@@ -224,7 +224,10 @@ class LogisticRegression_DPSGD(object):
         current_iter = 0
         noisy_gradient = 1
         self.cost = []
-        X, y = self.init_theta(X, y)
+        #X, y = self.init_theta(X, y) # should be called from outsite
+                                      # as when multiple communication rounds happen
+                                      # theta should only be intialised once and then
+                                      # updated
 
         while (current_iter < self.max_iter and np.sqrt(np.sum(noisy_gradient ** 2)) > self.tolerance):
 
