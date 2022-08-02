@@ -118,6 +118,8 @@ class InitialState(AppState):
         print(vars(DPSGD_class)) #TODO: rmv
         self.store(key="DPSGD_class", value = DPSGD_class)
         self.log("Init fc-private-logistic-regression end", level = LogLevel.DEBUG) #TODO: rmv
+
+        self.store(key = "cur_computation_round", value = 0)
         return "local_computation"
 
 @app_state("obtain_weights")
@@ -160,6 +162,14 @@ class localComputationState(AppState):
         print("Local Training finished, updated class is:") #TODO rmv
         print(vars(DPSGD_class)) #TODO rmv
         print(DPSGD_class.theta.shape) #TODO: rmv
+
+        # save theta of each client
+        cur_computation_round = self.load("cur_computation_round") + 1
+        self.store(key = "cur_computation_round", value = cur_computation_round)
+        fp = open(os.path.join("mnt", "output", "model_{}_{}.pyc".format(
+            self.id, cur_computation_round)), 'wb')
+        np.save(fp, DPSGD_class.theta)
+
         # local update
         if self.is_coordinator:
             #TODO: add dp noise here possibly
@@ -190,6 +200,8 @@ class aggregateDataState(AppState):
         cur_comm = self.load("cur_communication_round") + 1
         self.store(key = "cur_communication_round",
                         value = cur_comm)
+        fp = open(os.path.join("mnt", "output", "aggmodel_{}.pyc".format(cur_comm)), "wb")
+        np.save(fp, weights_updated)
         print("cur_comm is {}".format(cur_comm))
         print("max_comm is {}".format(self.load("config")["communication_rounds"]))
         if cur_comm >= self.load("config")["communication_rounds"]:
@@ -205,6 +217,11 @@ class aggregateDataState(AppState):
             DPSGD_class = self.load("DPSGD_class")
             DPSGD_class.theta = weights_updated
             DPSGD_class.evaluate(X = self.load("X_test"), y = self.load("y_test"))
+            # save config (with numClients)
+            config = self.load("config")
+            config["numClients"] = len(self.clients)
+            fp = open(os.path.join("mnt", "output", "config.yaml"), "w")
+            yaml.dump(config, fp)
             return "terminal"
         else:
             # send data to clients
