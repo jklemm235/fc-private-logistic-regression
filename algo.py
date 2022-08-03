@@ -20,12 +20,12 @@ class LogisticRegression_DPSGD(object):
     max_iter : int, default=100
         number of iterations in stochastic gradient descent
 
-    lambda_ : float, default=0 (no penaly)
-        Regularization parameter lambda. L2 regularization
-
     tolerance : float, optional, default=1e-6
         Value indicating the weight change between epochs in which
-        gradient descent should terminated.
+        gradient descent should be terminated
+
+    lambda_ : float, default=0 (no penaly)
+        Regularization parameter lambda - L2 regularization
 
     DP : bool, default = False
         If False - uses SGD (standart SGD)
@@ -41,7 +41,7 @@ class LogisticRegression_DPSGD(object):
         noise scale
     """
 
-    def __init__(self, alpha=0.1, max_iter=100, lambda_=0.1, tolerance = 1e-6, DP = False, L=1, C=1, sigma=5, theta = None):
+    def __init__(self, alpha=0.1, max_iter=100, lambda_=0.1, tolerance = 1e-6, DP = False, L=1, C=1, sigma=5):
         self.alpha          = alpha
         self.max_iter       = max_iter
         self.lambda_        = lambda_
@@ -50,15 +50,15 @@ class LogisticRegression_DPSGD(object):
         self.L              = L
         self.C              = C
         self.sigma          = sigma
-        self.theta          = theta
-        self.cost = 0
+
 
     def predict(self, X, y):
+
         """
         Predict class labels for samples in X.
         Parameters
         ----------
-        X : array_like or sparse matrix, shape (n_samples, n_features)
+        X : array_like or sparse matrix, shape [n_samples, n_features]
             Samples.
 
         Returns
@@ -66,6 +66,7 @@ class LogisticRegression_DPSGD(object):
         labels : array, shape [n_samples]
             Predicted class label per sample.
         """
+        
         X = np.append(np.ones([X.shape[0],1]), X, axis=1) #add column to the data for bias
 
         if len(np.unique(y)) == 2: #binary classification
@@ -79,7 +80,9 @@ class LogisticRegression_DPSGD(object):
                         " class: %r")
         return pred_y
 
+
     def __softmax(self, z):
+
         """
         Softmax function with axes=1
 
@@ -92,13 +95,15 @@ class LogisticRegression_DPSGD(object):
         Returns
         -------
         Value of softmax function at z
-
         """
 
         return softmax(z, axis=1)
 
+
     def __sigmoid(self, z):
-        """Logistic (sigmoid) function, inverse of logit function
+
+        """
+        Logistic (sigmoid) function, inverse of logit function
 
         Parameters:
         ------------
@@ -109,14 +114,15 @@ class LogisticRegression_DPSGD(object):
         Returns:
         ---------
         Value of sigmoid function at z
-
         """
 
         return 1 / (1 + np.exp(-z))
 
+
     def logLiklihood_loss(self, X, y):
 
-        """Regularizd log-liklihood function with L2 regularization
+        """
+        Regularizd log-liklihood function with L2 regularization
 
         Parameters
         -----------
@@ -129,17 +135,17 @@ class LogisticRegression_DPSGD(object):
         Returns
         -----------
         Value of the cost function for given feature vectors and target values:
-
         """
 
         reg_term = self.lambda_ / 2 * np.linalg.norm(self.theta) #l2 penatly
 
         return -1 * np.sum((y * np.log(self.pred_func(np.dot(X,self.theta)))) + ((1 - y) * np.log(1 - self.pred_func(np.dot(X,self.theta))))) + reg_term
 
+
     def init_theta(self, X, y):
 
         """
-        Initialize the model and prepare the features and labels for training
+        Initializes the model and prediction function and prepares the features and labels for training
 
         Parameters
         -----------
@@ -153,7 +159,6 @@ class LogisticRegression_DPSGD(object):
         -----------
         X - feature vector with bias variable: shape = [n_samples, n_features + 1]
         y - trager values (original or one-hot-encoded): shape = [n_samples,]
-
         """
 
         X = np.append(np.ones([X.shape[0],1]), X, axis=1) #add column to the data for bias
@@ -169,13 +174,13 @@ class LogisticRegression_DPSGD(object):
                         "This solver needs samples of at least 2 classes"
                         " in the data, but the data contains only one"
                         " class: %r")
-
         return X, y
+
 
     def SGD(self, X, y):
 
         """
-        Stochastic Gradient Descent, changes self.theta and self.cost
+        Stochastic Gradient Descent, changes self.theta
 
         Parameters
         -----------
@@ -184,26 +189,24 @@ class LogisticRegression_DPSGD(object):
 
         y : list, shape = [n_samples,]
             target values
-
         """
 
         current_iter = 0
         gradient = 1
-        self.cost = []
-        X, y = self.init_theta(X, y)
-
+        # self.cost = []
+        
         while (current_iter < self.max_iter and np.sqrt(np.sum(gradient ** 2)) > self.tolerance):
 
             for i in range(X.shape[0]):
                 random_sample = random.randint(0, X.shape[0]-1)
                 x_sample = X[random_sample]
                 y_sample = y[random_sample]
-                error = self.pred_func(np.dot(X,self.theta)) - y
-                gradient = (X.T.dot(np.array(error))+ self.lambda_ * self.theta) / X.shape[0]
+                error = self.pred_func(np.dot(x_sample,self.theta)) - y_sample
+                gradient = x_sample.T.dot(np.array(error))+ self.lambda_ * self.theta
                 self.theta = self.theta - self.alpha * gradient
 
             current_iter += 1
-            self.cost.append(self.logLiklihood_loss(X, y))
+            # self.cost.append(self.logLiklihood_loss(X, y))
 
 
     def DP_SGD(self, X, y):
@@ -218,17 +221,12 @@ class LogisticRegression_DPSGD(object):
 
         y : list, shape = [n_samples,]
             target values
-
         """
 
         current_iter = 0
         noisy_gradient = 1
-        self.cost = []
-        #X, y = self.init_theta(X, y) # should be called from outsite
-                                      # as when multiple communication rounds happen
-                                      # theta should only be intialised once and then
-                                      # updated
-
+        # self.cost = []
+        
         while (current_iter < self.max_iter and np.sqrt(np.sum(noisy_gradient ** 2)) > self.tolerance):
 
             for epoch in range(int(X.shape[0]/self.L)):
@@ -238,8 +236,8 @@ class LogisticRegression_DPSGD(object):
                 for i in randomized_samples:
                     x_sample = X[i]
                     y_sample = y[i]
-                    error = self.pred_func(np.dot(X,self.theta)) - y
-                    gradient = (X.T.dot(np.array(error))+ self.lambda_ * self.theta) / X.shape[0]
+                    error = self.pred_func(np.dot(x_sample,self.theta)) - y_sample
+                    gradient = (x_sample.T.dot(np.array(error))+ self.lambda_ * self.theta) / x_sample.shape[0]
                     # clip the gradient
                     gradient_norm = math.sqrt(np.sum(gradient ** 2))
                     gradient_clip = gradient / max(1, gradient_norm / self.C)
@@ -251,13 +249,13 @@ class LogisticRegression_DPSGD(object):
                 self.theta = self.theta - self.alpha * noisy_gradient
 
             current_iter += 1
-            self.cost.append(self.logLiklihood_loss(X, y))
+            # self.cost.append(self.logLiklihood_loss(X, y))
 
 
     def train(self, X, y):
 
         """
-        Training Logistic Regression with SGD or DP_SGD
+        Trains Logistic Regression with SGD or DP_SGD
 
         Parameters
         -----------
@@ -266,7 +264,6 @@ class LogisticRegression_DPSGD(object):
 
         y : list, shape = [n_samples,]
             target values
-
         """
 
         if self.DP:
@@ -278,7 +275,7 @@ class LogisticRegression_DPSGD(object):
     def evaluate(self, X, y):
 
         """
-        Evaluating the model, printing accuracy and confusion matrix
+        Evaluats the model, prints accuracy and confusion matrix
 
         Parameters
         -----------
@@ -287,7 +284,6 @@ class LogisticRegression_DPSGD(object):
 
         y : list, shape = [n_samples,]
             target values
-
         """
 
         y_pred =  self.predict(X, y) # calculate predictions
@@ -300,4 +296,3 @@ class LogisticRegression_DPSGD(object):
         conf_mat = confusion_matrix(y, y_pred_target)
         print("The accuracy of the model :", round(accuracy,3)*100,"%")
         print("Confusion Matrix:\n",conf_mat)
-
