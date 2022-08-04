@@ -11,3 +11,4 @@ communication_rounds: 3 # number of times the local models get aggregated and th
 dpMode: # list, different modes: dpSgd, dpClient, dpCoordinator or null for no dp at all
             # all modes can be combined with each other other
         - "dpSgd"
+        - "dpClient"
