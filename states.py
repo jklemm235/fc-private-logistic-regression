@@ -9,7 +9,7 @@ This demo implementation works as follows:
 
 
 
-from FeatureCloud.app.engine.app import AppState, app_state, Role, LogLevel
+from FeatureCloud.app.engine.app import AppState, app_state, Role, DPNoisetype, LogLevel
 import algo
 
 import os
@@ -57,19 +57,20 @@ class InitialState(AppState):
 
         # load in data in self.internal["data"]
         #TODO: fix so it always loads data correctly when it is known how docker works
-        train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_set.csv"), index_col=0)
-        test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_set.csv"), index_col=0)
+        train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_set.csv"), header= None)
+        test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_set.csv"), header = None)
 
-        X_train = np.array(train_data.drop(columns=['label']))
+        X_train = np.array(train_data[1:])
         X = np.array(X_train)
-        y_train = np.array(train_data['label'])
+        y_train = np.array(train_data[0])
+
         print("Shape of loaded data is:") #TODO: rmv
         print(X.shape) #TODO: rmv
         print(y_train.shape) #TODO: rmv
         # not put in dict yet, they will be modified first by the LogisticRegression_DPSGD class
 
-        X_test = np.array(test_data.drop(columns=['label']))
-        y_test = np.array(test_data['label'])
+        X_test = np.array(test_data[1:])
+        y_test = np.array(test_data[0])
         self.store(key = "X_test", value = X_test)
         self.store(key = "y_test", value = y_test)
 
@@ -81,15 +82,7 @@ class InitialState(AppState):
         if self.is_coordinator:
             self.store(key = "cur_communication_round", value = 0)
 
-
-        # DP information
-        #TODO: also other DP modes
-        if "dpSgd" in config["dpMode"]:
-            withDPSGD = True
-        else:
-            withDPSGD = False
-
-        # SGD Class creation
+        # read in config
         try:
             alpha = config["sgdOptions"]["alpha"]
             max_iter = config["sgdOptions"]["max_iter"]
@@ -99,18 +92,48 @@ class InitialState(AppState):
             C = config["sgdOptions"]["C"]
             sigma = config["sgdOptions"]["sigma"]
             #TODO: theta should be read in here
+            print("Loaded config succesfully")
         except Exception as err:
             self.log(f"Config file seems to miss fields: {err}")
 
+
+
+        # DP information DPSGD
+        #TODO: also other DP modes
+        if "dpSgd" in config["dpMode"]:
+            withDPSGD = True
+        else:
+            withDPSGD = False
+        if "dpClient" in self.load("config")["dpMode"]:
+            print("dpClient ON") #TODO: rmv
+            self.store(key = "dpClient", value = True)
+            if lambda_ == 0:
+                self.log(f"dpClient must be used with regularization!" , level = LogLevel.FATAL)
+            # for dp via controller
+            self.configure_dp(epsilon = 150, delta =  0.0,
+                     sensitivity = lambda_ * 2.0,
+                     clippingVal = None,
+                     noisetype = DPNoisetype.LAPLACE)
+            #TODO: change to correct values especially epsilon, ...
+            print(self._app.default_dp)
+        else:
+            print("dpClient OFF") #TODO: rmv
+            self.store(key = "dpClient", value = False)
+
+
+
+
+        # SGD Class creation
         DPSGD_class = algo.LogisticRegression_DPSGD(alpha=alpha, max_iter=max_iter,
                                     lambda_=lambda_, tolerance = tolerance,
-                                    DP = withDPSGD, L=L, C=C, sigma=sigma, theta =  None)
+                                    DP = withDPSGD, L=L, C=C, sigma=sigma)
         # TODO fix theta, should be in config file
         print("Shape of X and y_train and theta before storing") #TODO; rmv
         X, y_train = DPSGD_class.init_theta(X, y_train)
         print(X.shape) #TODO rmbv
         print(y_train.shape) #TODO rmbv
         print(DPSGD_class.theta.shape) #TODO: rmv
+        self.store(key = "shapeTheta", value = DPSGD_class.theta.shape)
         self.store(key = "X", value = X)
         self.store(key = "y_train", value = y_train)
 
@@ -131,10 +154,12 @@ class obtainWeights(AppState):
     def run(self):
         # update from broadcast_data
         DPSGD_class = self.load("DPSGD_class")
-        DPSGD_class.theta = self.await_data(n = 1, unwrap=True, is_json=False)
+        DPSGD_class.theta = np.array(self.await_data(n = 1, unwrap=False, is_json=False)).reshape(
+                                        self.load("shapeTheta"))
         self.store(key="DPSGD_class", value = DPSGD_class)
         print(vars(DPSGD_class))
         print("obtained weights: {}".format(DPSGD_class.theta))
+        print("shape obtained weights: {}".format(DPSGD_class.theta.shape))
         return "local_computation"
 
 @app_state("local_computation")
@@ -157,7 +182,10 @@ class localComputationState(AppState):
         print("Training with the following shaped data:") #TODO rmv
         print(X.shape)
         print(y.shape)
-        DPSGD_class.train(X, y)
+        print("theta is (+ shape):")
+        print(DPSGD_class.theta)
+        print(DPSGD_class.theta.shape)
+        #DPSGD_class.train(X, y)
         self.store(key="DPSGD_class", value = DPSGD_class)
         print("Local Training finished, updated class is:") #TODO rmv
         print(vars(DPSGD_class)) #TODO rmv
@@ -170,13 +198,19 @@ class localComputationState(AppState):
             self.id, cur_computation_round)), 'wb')
         np.save(fp, DPSGD_class.theta)
 
+        if self.load("dpClient"):
+            # necessary or json cant handle the ndarray
+            DPSGD_class.theta = DPSGD_class.theta.tolist()
+
         # local update
         if self.is_coordinator:
             #TODO: add dp noise here possibly
-            self.send_data_to_coordinator(DPSGD_class.theta, send_to_self = True, use_smpc = False)
+            self.send_data_to_coordinator(DPSGD_class.theta, send_to_self = True, use_smpc = False,
+                                          use_dp = self.load("dpClient"))
             return "aggregate_data"
         else:
-            self.send_data_to_coordinator(DPSGD_class.theta, send_to_self = False, use_smpc = False)
+            self.send_data_to_coordinator(DPSGD_class.theta, send_to_self = False, use_smpc = False,
+                                          use_dp = self.load("dpClient"))
             #TODO: possibly an infinite loop here? Or does the coordinator
             # finnishing also terminate every client?
             return "obtain_weights"
@@ -193,8 +227,8 @@ class aggregateDataState(AppState):
 
     def run(self):
         # TODO: how to manage coordinator adding noise, best add func in template
-        weights_updated = self.aggregate_data(use_smpc=False)
-        print(weights_updated.shape) #TODO rmv
+        print("Aggregating data")
+        weights_updated = self.aggregate_data(use_smpc=False, use_dp = self.load("dpClient"))
         print("aggregated weights:") #TODO: remove prints
         print(weights_updated) #TODO rmv
         cur_comm = self.load("cur_communication_round") + 1

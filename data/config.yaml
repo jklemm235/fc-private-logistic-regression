@@ -1,7 +1,7 @@
 sgdOptions:
     alpha: 0.01 # learning rate
     max_iter  : 1 # number of iterations for the local SGD per communication rounds
-    lambda_: 0 # Regularization parameter lambda
+    lambda_: 0.5 # Regularization parameter lambda
     tolerance: 0.000005
     L: 10 #Lot size in DPSGD
     C: 1 # norm bound
@@ -12,3 +12,4 @@ dpMode: # list, different modes: dpSgd, dpClient, dpCoordinator or null for no d
             # all modes can be combined with each other other
         - "dpSgd"
         - "dpClient"
+        #- "dpCoordinator" # TODO: implement!

@@ -1,4 +1,3 @@
-featurecloud
 bottle
 jsonpickle
 joblib

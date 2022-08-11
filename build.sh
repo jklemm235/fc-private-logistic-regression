@@ -1,4 +1,4 @@
 #!/bin/bash
 
-docker build . --tag fc_private_logReg
+docker build . --tag fc-private-logistic-regression
 
