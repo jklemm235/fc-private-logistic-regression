@@ -194,6 +194,7 @@ class aggregateDataState(AppState):
     def run(self):
         # TODO: how to manage coordinator adding noise, best add func in template
         weights_updated = self.aggregate_data(use_smpc=False)
+        weights_updated = weights_updated / len(self._app.clients)
         print(weights_updated.shape) #TODO rmv
         print("aggregated weights:") #TODO: remove prints
         print(weights_updated) #TODO rmv
