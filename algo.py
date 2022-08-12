@@ -188,8 +188,8 @@ class LogisticRegression_DPSGD(object):
                 random_sample = random.randint(0, X.shape[0]-1)
                 x_sample = X[random_sample]
                 y_sample = y[random_sample]
-                error = self.pred_func(np.dot(x_sample,self.theta)) - y_sample
-                gradient = x_sample.reshape((-1,1)).dot(np.array(error).reshape((1,-1)))+ self.lambda_ * self.theta
+                error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
+                gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
                 self.theta = self.theta - self.alpha * gradient
 
             current_iter += 1
@@ -223,8 +223,8 @@ class LogisticRegression_DPSGD(object):
                 for i in randomized_samples:
                     x_sample = X[i]
                     y_sample = y[i]
-                    error = self.pred_func(np.dot(x_sample,self.theta)) - y_sample
-                    gradient = (x_sample.reshape((-1,1)).dot(np.array(error).reshape((1,-1)))+ self.lambda_ * self.theta) / x_sample.shape[0]
+                    error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
+                    gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
                     # clip the gradient
                     gradient_norm = math.sqrt(np.sum(gradient ** 2))
                     gradient_clip = gradient / max(1, gradient_norm / self.C)
