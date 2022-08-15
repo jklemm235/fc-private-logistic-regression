@@ -3,7 +3,7 @@ import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import matplotlib.pyplot as plt
 import random
 import math
-from scipy.special import softmax, expit
+from scipy.special import softmax
 
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import accuracy_score, confusion_matrix
@@ -66,38 +66,25 @@ class LogisticRegression_DPSGD(object):
         labels : array, shape [n_samples]
             Predicted class label per sample.
         """
-        
-        X = np.append(np.ones([X.shape[0],1]), X, axis=1) #add column to the data for bias
+
+        if self.theta.shape[0] == X.shape[1] + 1:
+            X = np.append(np.ones([X.shape[0],1]), X, axis=1) #add column to the data for bias
+        elif self.theta.shape[0] == X.shape[1]:
+            pass
+        else:
+            raise ValueError(
+                        "The size of model and input are not corresponding. Check self.theta.shape and X.shape. ")
 
         if len(np.unique(y)) == 2: #binary classification
             pred_y =  self.__sigmoid(np.dot(X,self.theta))
         elif len(np.unique(y)) > 2: #multi class classification
-            pred_y = self.__softmax(np.dot(X,self.theta), axis=1)
+            pred_y = softmax(np.dot(X,self.theta))
         else:
             raise ValueError(
                         "This solver needs samples of at least 2 classes"
                         " in the data, but the data contains only one"
-                        " class: %r")
+                        " class.")
         return pred_y
-
-
-    def __softmax(self, z):
-
-        """
-        Softmax function with axes=1
-
-        Parameters
-        ----------
-        z : float
-            linear combinations of weights and sample features
-            z = w_0*x_0 + w_1*x_1 + ... + w_n*x_n
-
-        Returns
-        -------
-        Value of softmax function at z
-        """
-
-        return softmax(z, axis=1)
 
 
     def __sigmoid(self, z):
@@ -168,7 +155,7 @@ class LogisticRegression_DPSGD(object):
         elif len(np.unique(y)) > 2: #multi class classification
             y = OneHotEncoder(sparse=False).fit_transform(y.reshape(-1,1)) #encoode the target values
             self.theta=np.ones((X.shape[1], y.shape[1]))
-            self.pred_func = self.__softmax #softmax
+            self.pred_func = softmax #softmax
         else:
             raise ValueError(
                         "This solver needs samples of at least 2 classes"
@@ -201,8 +188,8 @@ class LogisticRegression_DPSGD(object):
                 random_sample = random.randint(0, X.shape[0]-1)
                 x_sample = X[random_sample]
                 y_sample = y[random_sample]
-                error = self.pred_func(np.dot(x_sample,self.theta)) - y_sample
-                gradient = x_sample.T.dot(np.array(error))+ self.lambda_ * self.theta
+                error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
+                gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
                 self.theta = self.theta - self.alpha * gradient
 
             current_iter += 1
@@ -236,8 +223,8 @@ class LogisticRegression_DPSGD(object):
                 for i in randomized_samples:
                     x_sample = X[i]
                     y_sample = y[i]
-                    error = self.pred_func(np.dot(x_sample,self.theta)) - y_sample
-                    gradient = (x_sample.T.dot(np.array(error))+ self.lambda_ * self.theta) / x_sample.shape[0]
+                    error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
+                    gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
                     # clip the gradient
                     gradient_norm = math.sqrt(np.sum(gradient ** 2))
                     gradient_clip = gradient / max(1, gradient_norm / self.C)

@@ -110,10 +110,10 @@ class InitialState(AppState):
             if lambda_ == 0:
                 self.log(f"dpClient must be used with regularization!" , level = LogLevel.FATAL)
             # for dp via controller
-            self.configure_dp(epsilon = 150, delta =  0.0,
+            self.configure_dp(epsilon = 0.9, delta =  0.1,
                      sensitivity = lambda_ * 2.0,
                      clippingVal = None,
-                     noisetype = DPNoisetype.LAPLACE)
+                     noisetype = DPNoisetype.GAUSS)
             #TODO: change to correct values especially epsilon, ...
             print(self._app.default_dp)
         else:
@@ -185,7 +185,7 @@ class localComputationState(AppState):
         print("theta is (+ shape):")
         print(DPSGD_class.theta)
         print(DPSGD_class.theta.shape)
-        #DPSGD_class.train(X, y)
+        DPSGD_class.train(X, y)
         self.store(key="DPSGD_class", value = DPSGD_class)
         print("Local Training finished, updated class is:") #TODO rmv
         print(vars(DPSGD_class)) #TODO rmv
@@ -228,7 +228,8 @@ class aggregateDataState(AppState):
     def run(self):
         # TODO: how to manage coordinator adding noise, best add func in template
         print("Aggregating data")
-        weights_updated = self.aggregate_data(use_smpc=False, use_dp = self.load("dpClient"))
+        weights_updated = self.aggregate_data(use_smpc=False, use_dp = self.load("dpClient")) / \
+                len(self._app.clients)
         print("aggregated weights:") #TODO: remove prints
         print(weights_updated) #TODO rmv
         cur_comm = self.load("cur_communication_round") + 1
