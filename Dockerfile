@@ -9,8 +9,8 @@ COPY server_config/nginx /etc/nginx/sites-available/default
 COPY server_config/docker-entrypoint.sh /entrypoint.sh
 
 COPY requirements.txt /app/requirements.txt
-COPY FeatureCloud-0.0.17.tar.gz /app/FeatureCloud-0.0.17.tar.gz
-RUN python3 -m pip install ./app/FeatureCloud-0.0.17.tar.gz
+COPY FeatureCloud-0.0.18.tar.gz /app/FeatureCloud-0.0.18.tar.gz
+RUN python3 -m pip install ./app/FeatureCloud-0.0.18.tar.gz
 RUN pip3 install -r ./app/requirements.txt
 
 COPY . /app
