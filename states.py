@@ -104,7 +104,7 @@ class InitialState(AppState):
 
         DPSGD_class = algo.LogisticRegression_DPSGD(alpha=alpha, max_iter=max_iter,
                                     lambda_=lambda_, tolerance = tolerance,
-                                    DP = withDPSGD, L=L, C=C, sigma=sigma, theta =  None)
+                                    DP = withDPSGD, L=L, C=C, sigma=sigma)
         # TODO fix theta, should be in config file
         print("Shape of X and y_train and theta before storing") #TODO; rmv
         X, y_train = DPSGD_class.init_theta(X, y_train)
