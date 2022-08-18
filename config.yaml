@@ -5,11 +5,12 @@ sgdOptions:
     tolerance: 0.000005
     L: 10 #Lot size in DPSGD
     C: 1 # norm bound
-    sigma: 1 # noise scale
+    epsilon: 5.0
+    delta: 0.0 # if 0 laplace noise, else gauss noise
 
+labelColumn: "chance"
 communication_rounds: 3 # number of times the local models get aggregated and then broadcasted
 dpMode: # list, different modes: dpSgd, dpClient, dpCoordinator or null for no dp at all
             # all modes can be combined with each other other
         - "dpSgd"
         - "dpClient"
-        #- "dpCoordinator" # TODO: implement!
