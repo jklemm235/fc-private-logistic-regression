@@ -257,7 +257,7 @@ class LogisticRegression_DPSGD(object):
 
         current_iter = 0
         noisy_gradient = 1
-        self.noise_from_epsilon(self, X) #calculate noise with given epsilon
+        self.noise_from_epsilon(X) #calculate noise with given epsilon
         # self.cost = []
         
         while (current_iter < self.max_iter and np.sqrt(np.sum(noisy_gradient ** 2)) > self.tolerance):
