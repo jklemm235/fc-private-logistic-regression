@@ -172,7 +172,7 @@ class LogisticRegression_DPSGD(object):
         return X, y
 
 
-    def SGD(self, X, y):
+    def old_SGD(self, X, y):
 
         """
         Stochastic Gradient Descent, changes self.theta
@@ -199,6 +199,43 @@ class LogisticRegression_DPSGD(object):
                 error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
                 gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
                 self.theta = self.theta - self.alpha * gradient
+
+            current_iter += 1
+            # self.cost.append(self.logLiklihood_loss(X, y))
+
+    def SGD(self, X, y):
+
+        """
+        Stochastic Gradient Descent, changes self.theta
+
+        Parameters
+        -----------
+        X : {array-like}, shape = [n_samples, n_features]
+            feature vectors.
+
+        y : list, shape = [n_samples,]
+            target values
+        """
+
+        current_iter = 0
+        gradient = 1
+        # self.cost = []
+        
+        while (current_iter < self.max_iter and np.sqrt(np.sum(mini_batch_gradient ** 2)) > self.tolerance):
+
+            for epoch in range(int(X.shape[0]/self.L)):
+                randomized_samples = random.sample(range(0,X.shape[0]), self.L) #randomly select the lot/batch with probability L/n, n = X.shape[0]
+
+                lots_gradients = []
+                for i in randomized_samples:
+                    x_sample = X[i]
+                    y_sample = y[i]
+                    error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
+                    gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
+                    lots_gradients.append(gradient)
+
+                mini_batch_gradient = np.sum(lots_gradients, axis=0) / self.L
+                self.theta = self.theta - self.alpha * mini_batch_gradient
 
             current_iter += 1
             # self.cost.append(self.logLiklihood_loss(X, y))
