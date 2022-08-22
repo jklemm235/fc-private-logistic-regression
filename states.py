@@ -109,6 +109,14 @@ class InitialState(AppState):
         self.store(key = "n", value = n)
         self.store(key = "d", value = d)
 
+        if not DPSGD_class.L:
+            # use all data if L = nil was given
+            DPSGD_class.L = n
+        elif DPSGD_class.L < 1:
+            # change L to the correct value if L is a percentage
+            DPSGD_class.L = int(DPSGD_class.L * n)
+        # else keep L as it is
+
         # modify data depending on which prediction function is used
         # (binary vs multiple classes)
         X, y_train = DPSGD_class.init_theta(X, y_train)
@@ -116,7 +124,6 @@ class InitialState(AppState):
         self.store(key = "y_train", value = y_train)
 
         self.store(key="DPSGD_class", value = DPSGD_class)
-        self.log("Init fc-private-logistic-regression end", level = LogLevel.DEBUG) #TODO: rmv
 
         self.store(key = "cur_computation_round", value = 0)
         return "local_computation"
@@ -158,7 +165,7 @@ class localComputationState(AppState):
         cur_computation_round = self.load("cur_computation_round") + 1
         self.store(key = "cur_computation_round", value = cur_computation_round)
         fp = open(os.path.join("mnt", "output", "model_{}_{}.pyc".format(
-            self.id, cur_computation_round)), 'wb') #TODO: rmv in Master
+            self.id, cur_computation_round)), 'wb')
         np.save(fp, DPSGD_class.theta)
 
         # local update
@@ -191,7 +198,6 @@ class aggregateDataState(AppState):
         self.store(key = "cur_communication_round",
                         value = cur_comm)
 
-        #TODO: rmv in master
         fp = open(os.path.join("mnt", "output", "aggmodel_{}.pyc".format(cur_comm)), "wb")
         np.save(fp, weights_updated)
 
@@ -200,8 +206,6 @@ class aggregateDataState(AppState):
             fp = open(os.path.join("mnt", "output", "trained_model.pyc".format(cur_comm)), "wb")
             np.save(fp, weights_updated)
 
-
-            #TODO: rmv in Master
             DPSGD_class = self.load("DPSGD_class")
             DPSGD_class.theta = weights_updated
             DPSGD_class.evaluate(X = self.load("X_test"), y = self.load("y_test"))
