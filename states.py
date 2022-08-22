@@ -109,6 +109,20 @@ class InitialState(AppState):
         self.store(key = "n", value = n)
         self.store(key = "d", value = d)
 
+        if not DPSGD_class.L:
+            # use all data if L = nil was given
+            DPSGD_class.L = n
+        elif DPSGD_class.L < 1:
+            # change L to the correct value if L is a percentage
+            DPSGD_class.L = int(DPSGD_class.L * n)
+        # else keep L as it is
+
+        #TODO: rmv
+        print("L is :")
+        print(DPSGD_class.L)
+        print("n is:")
+        print(n)
+
         # modify data depending on which prediction function is used
         # (binary vs multiple classes)
         X, y_train = DPSGD_class.init_theta(X, y_train)
