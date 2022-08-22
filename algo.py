@@ -7,6 +7,8 @@ from scipy.special import softmax
 
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import accuracy_score, confusion_matrix
+from tensorflow_privacy.privacy.analysis import compute_noise_from_budget_lib
+
 
 class LogisticRegression_DPSGD(object):
 
@@ -37,11 +39,15 @@ class LogisticRegression_DPSGD(object):
     C : float, default=1
         gradient norm bound
 
-    sigma: float, default=5
-        noise scale
+    epsilon: float, default=0.1
+        privacy loss
+
+    delta: float, default=0.1
+        probability of privacy leakage
+
     """
 
-    def __init__(self, alpha=0.1, max_iter=100, lambda_=0.1, tolerance = 1e-6, DP = False, L=1, C=1, sigma=5):
+    def __init__(self, alpha=0.1, max_iter=100, lambda_=0.1, tolerance = 1e-6, DP = False, L=1, C=1, epsilon=0.1, delta=10e-5):
         self.alpha          = alpha
         self.max_iter       = max_iter
         self.lambda_        = lambda_
@@ -49,13 +55,15 @@ class LogisticRegression_DPSGD(object):
         self.DP             = DP
         self.L              = L
         self.C              = C
-        self.sigma          = sigma
-
+        self.epsilon        = epsilon
+        self.delta          = delta
+       
 
     def predict(self, X, y):
 
         """
-        Predict class labels for samples in X.
+        Predict class labels for samples in X
+
         Parameters
         ----------
         X : array_like or sparse matrix, shape [n_samples, n_features]
@@ -64,7 +72,7 @@ class LogisticRegression_DPSGD(object):
         Returns
         -------
         labels : array, shape [n_samples]
-            Predicted class label per sample.
+            Predicted class labels
         """
 
         if self.theta.shape[0] == X.shape[1] + 1:
@@ -151,11 +159,11 @@ class LogisticRegression_DPSGD(object):
         X = np.append(np.ones([X.shape[0],1]), X, axis=1) #add column to the data for bias
         if len(np.unique(y)) == 2: #binary classification
             self.theta=np.ones(X.shape[1])
-            self.pred_func = self.__sigmoid #sigmoid
+            self.pred_func = self.__sigmoid 
         elif len(np.unique(y)) > 2: #multi class classification
             y = OneHotEncoder(sparse=False).fit_transform(y.reshape(-1,1)) #encoode the target values
             self.theta=np.ones((X.shape[1], y.shape[1]))
-            self.pred_func = softmax #softmax
+            self.pred_func = softmax 
         else:
             raise ValueError(
                         "This solver needs samples of at least 2 classes"
@@ -212,6 +220,7 @@ class LogisticRegression_DPSGD(object):
 
         current_iter = 0
         noisy_gradient = 1
+        self.noise_from_epsilon(self, X) #calculate noise with given epsilon
         # self.cost = []
         
         while (current_iter < self.max_iter and np.sqrt(np.sum(noisy_gradient ** 2)) > self.tolerance):
@@ -283,3 +292,16 @@ class LogisticRegression_DPSGD(object):
         conf_mat = confusion_matrix(y, y_pred_target)
         print("The accuracy of the model :", round(accuracy,3)*100,"%")
         print("Confusion Matrix:\n",conf_mat)
+
+    def noise_from_epsilon(self, X):
+        """
+        Calculates noise (self.sigma) for DP-SGD with given epsilon
+
+        Parameters
+        -----------
+        X : {array-like}, shape = [n_samples, n_features]
+            feature vectors.
+        
+        """
+        self.sigma = compute_noise_from_budget_lib.compute_noise(n=X.shape[0], batch_size=self.L, target_epsilon=self.epsilon, epochs=self.max_iter, delta=self.delta, noise_lbd=self.C)
+
