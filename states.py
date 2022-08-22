@@ -81,7 +81,6 @@ class InitialState(AppState):
         if self.is_coordinator:
             self.store(key = "cur_communication_round", value = 0)
 
-
         # DP information
         #TODO: also other DP modes
         if "dpSgd" in config["dpMode"]:
@@ -90,21 +89,20 @@ class InitialState(AppState):
             withDPSGD = False
 
         # SGD Class creation
+        DPSGD_class = algo.LogisticRegression_DPSGD()
         try:
-            alpha = config["sgdOptions"]["alpha"]
-            max_iter = config["sgdOptions"]["max_iter"]
-            lambda_ = config["sgdOptions"]["lambda_"]
-            tolerance = config["sgdOptions"]["tolerance"]
-            L = config["sgdOptions"]["L"]
-            C = config["sgdOptions"]["C"]
-            sigma = config["sgdOptions"]["sigma"]
+            DPSGD_class.alpha = config["sgdOptions"]["alpha"]
+            DPSGD_class.max_iter = config["sgdOptions"]["max_iter"]
+            DPSGD_class.lambda_ = config["sgdOptions"]["lambda_"]
+            DPSGD_class.tolerance = config["sgdOptions"]["tolerance"]
+            DPSGD_class.L = config["sgdOptions"]["L"]
+            DPSGD_class.C = config["dpOptions"]["C"]
+            DPSGD_class.epsilon = config["dpOptions"]["epsilon"]
+            DPSGD_class.delta = config["dpOptions"]["epsilon"]
             #TODO: theta should be read in here
         except Exception as err:
             self.log(f"Config file seems to miss fields: {err}")
 
-        DPSGD_class = algo.LogisticRegression_DPSGD(alpha=alpha, max_iter=max_iter,
-                                    lambda_=lambda_, tolerance = tolerance,
-                                    DP = withDPSGD, L=L, C=C, sigma=sigma)
         # TODO fix theta, should be in config file
         print("Shape of X and y_train and theta before storing") #TODO; rmv
         X, y_train = DPSGD_class.init_theta(X, y_train)
