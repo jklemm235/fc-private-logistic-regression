@@ -53,24 +53,43 @@ class InitialState(AppState):
         except Exception as err:
             self.log(f"Error loading config.yaml: f{err}" , level = LogLevel.FATAL)
 
+
+        # read in config
+        try:
+            labelColumn = config["labelColumn"]
+            alpha = config["sgdOptions"]["alpha"]
+            max_iter = config["sgdOptions"]["max_iter"]
+            lambda_ = config["sgdOptions"]["lambda_"]
+            tolerance = config["sgdOptions"]["tolerance"]
+            L = config["sgdOptions"]["L"]
+            C = config["sgdOptions"]["C"]
+            epsilon = config["dpOptions"]["epsilon"]
+            delta = config["dpOptions"]["delta"]
+            #TODO: theta should be read in here
+            print("Loaded config succesfully")
+        except Exception as err:
+            self.log(f"Config file seems to miss fields: {err}")
+            raise Exception("Could not read config file")
+
+
         self.store(key = "config", value = config)
 
-        # load in data in self.internal["data"]
+        # load in data in  self.internal["data"]
         #TODO: fix so it always loads data correctly when it is known how docker works
-        train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_set.csv"), header= None)
-        test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_set.csv"), header = None)
-
-        X_train = np.array(train_data[1:])
+        train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_data.csv"), header= 0)
+        test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_data.csv"), header = 0)
+        print(train_data.columns)
+        X_train = train_data.drop(labelColumn, axis=1)
         X = np.array(X_train)
-        y_train = np.array(train_data[0])
+        y_train = train_data[labelColumn]
 
         print("Shape of loaded data is:") #TODO: rmv
         print(X.shape) #TODO: rmv
         print(y_train.shape) #TODO: rmv
         # not put in dict yet, they will be modified first by the LogisticRegression_DPSGD class
 
-        X_test = np.array(test_data[1:])
-        y_test = np.array(test_data[0])
+        X_test = np.array(test_data.drop(labelColumn, axis=1))
+        y_test = np.array(test_data[labelColumn])
         self.store(key = "X_test", value = X_test)
         self.store(key = "y_test", value = y_test)
 
@@ -82,35 +101,26 @@ class InitialState(AppState):
         if self.is_coordinator:
             self.store(key = "cur_communication_round", value = 0)
 
-        # read in config
-        try:
-            alpha = config["sgdOptions"]["alpha"]
-            max_iter = config["sgdOptions"]["max_iter"]
-            lambda_ = config["sgdOptions"]["lambda_"]
-            tolerance = config["sgdOptions"]["tolerance"]
-            L = config["sgdOptions"]["L"]
-            C = config["sgdOptions"]["C"]
-            sigma = config["sgdOptions"]["sigma"]
-            #TODO: theta should be read in here
-            print("Loaded config succesfully")
-        except Exception as err:
-            self.log(f"Config file seems to miss fields: {err}")
-
-
-
         # DP information DPSGD
+        if not delta:
+            delta = 0.0
         #TODO: also other DP modes
         if "dpSgd" in config["dpMode"]:
             withDPSGD = True
+            print("using DPSGD")
         else:
             withDPSGD = False
+            print("DPSGD OFF")
+
         if "dpClient" in self.load("config")["dpMode"]:
             print("dpClient ON") #TODO: rmv
             self.store(key = "dpClient", value = True)
             if lambda_ == 0:
                 self.log(f"dpClient must be used with regularization!" , level = LogLevel.FATAL)
             # for dp via controller
-            self.configure_dp(epsilon = 0.9, delta =  0.1,
+            if not epsilon:
+                self.log("Config file did not contain epsilon although it dpMode dpClient is on")
+            self.configure_dp(epsilon = epsilon, delta =  delta,
                      sensitivity = lambda_ * 2.0,
                      clippingVal = None,
                      noisetype = DPNoisetype.GAUSS)
@@ -124,9 +134,10 @@ class InitialState(AppState):
 
 
         # SGD Class creation
+        #TODO: give correct sigma
         DPSGD_class = algo.LogisticRegression_DPSGD(alpha=alpha, max_iter=max_iter,
                                     lambda_=lambda_, tolerance = tolerance,
-                                    DP = withDPSGD, L=L, C=C, sigma=sigma)
+                                    DP = withDPSGD, L=L, C=C)
         # TODO fix theta, should be in config file
         print("Shape of X and y_train and theta before storing") #TODO; rmv
         X, y_train = DPSGD_class.init_theta(X, y_train)
