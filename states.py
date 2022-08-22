@@ -60,16 +60,16 @@ class InitialState(AppState):
         train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_set.csv"), index_col=0)
         test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_set.csv"), index_col=0)
 
-        X_train = np.array(train_data.drop(columns=['label']))
+        X_train = np.array(train_data.drop(columns=['Chance']))
         X = np.array(X_train)
-        y_train = np.array(train_data['label'])
+        y_train = np.array(train_data['Chance'])
         print("Shape of loaded data is:") #TODO: rmv
         print(X.shape) #TODO: rmv
         print(y_train.shape) #TODO: rmv
         # not put in dict yet, they will be modified first by the LogisticRegression_DPSGD class
 
-        X_test = np.array(test_data.drop(columns=['label']))
-        y_test = np.array(test_data['label'])
+        X_test = np.array(test_data.drop(columns=['Chance']))
+        y_test = np.array(test_data['Chance'])
         self.store(key = "X_test", value = X_test)
         self.store(key = "y_test", value = y_test)
 
@@ -81,15 +81,15 @@ class InitialState(AppState):
         if self.is_coordinator:
             self.store(key = "cur_communication_round", value = 0)
 
+
+        DPSGD_class = algo.LogisticRegression_DPSGD()
         # DP information
-        #TODO: also other DP modes
         if "dpSgd" in config["dpMode"]:
-            withDPSGD = True
+            DPSGD_class.DP = True
         else:
-            withDPSGD = False
+            DPSGD_class.DP = False
 
         # SGD Class creation
-        DPSGD_class = algo.LogisticRegression_DPSGD()
         try:
             DPSGD_class.alpha = config["sgdOptions"]["alpha"]
             DPSGD_class.max_iter = config["sgdOptions"]["max_iter"]
@@ -99,21 +99,13 @@ class InitialState(AppState):
             DPSGD_class.C = config["dpOptions"]["C"]
             DPSGD_class.epsilon = config["dpOptions"]["epsilon"]
             DPSGD_class.delta = config["dpOptions"]["epsilon"]
-            #TODO: theta should be read in here
         except Exception as err:
             self.log(f"Config file seems to miss fields: {err}")
 
-        # TODO fix theta, should be in config file
-        print("Shape of X and y_train and theta before storing") #TODO; rmv
         X, y_train = DPSGD_class.init_theta(X, y_train)
-        print(X.shape) #TODO rmbv
-        print(y_train.shape) #TODO rmbv
-        print(DPSGD_class.theta.shape) #TODO: rmv
         self.store(key = "X", value = X)
         self.store(key = "y_train", value = y_train)
 
-        #TODO: change sigma to epsilon + delta and calc sigma, also change config.yaml accordingly
-        print(vars(DPSGD_class)) #TODO: rmv
         self.store(key="DPSGD_class", value = DPSGD_class)
         self.log("Init fc-private-logistic-regression end", level = LogLevel.DEBUG) #TODO: rmv
 
@@ -152,9 +144,6 @@ class localComputationState(AppState):
 
         "Train Logistic regression with SGD"
         DPSGD_class = self.load("DPSGD_class")
-        print("Training with the following shaped data:") #TODO rmv
-        print(X.shape)
-        print(y.shape)
         DPSGD_class.train(X, y)
         self.store(key="DPSGD_class", value = DPSGD_class)
         print("Local Training finished, updated class is:") #TODO rmv

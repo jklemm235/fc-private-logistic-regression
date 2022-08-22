@@ -9,3 +9,4 @@ pyyaml
 sklearn
 matplotlib
 seaborn
+tensorflow-privacy
