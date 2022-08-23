@@ -340,5 +340,5 @@ class LogisticRegression_DPSGD(object):
             feature vectors.
         
         """
-        self.sigma = compute_noise_from_budget_lib.compute_noise(n=X.shape[0], batch_size=self.L, target_epsilon=self.epsilon, epochs=self.max_iter, delta=self.delta, noise_lbd=self.C)
+        self.sigma = compute_noise_from_budget_lib.compute_noise(n=X.shape[0], batch_size=self.L, target_epsilon=self.epsilon, epochs=self.max_iter, delta=self.delta, noise_lbd=1e-6)
 

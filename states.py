@@ -59,7 +59,7 @@ class InitialState(AppState):
         ### SGD Class creation
         DPSGD_class = algo.LogisticRegression_DPSGD()
         # DP information
-        if "dpSgd" in config["dpMode"]:
+        if "DPSGD" in [x.upper() for x in config["dpMode"]]:
             DPSGD_class.DP = True
         else:
             DPSGD_class.DP = False
@@ -72,12 +72,12 @@ class InitialState(AppState):
             DPSGD_class.L = config["sgdOptions"]["L"]
             DPSGD_class.C = config["dpOptions"]["C"]
             DPSGD_class.epsilon = config["dpOptions"]["epsilon"]
-            DPSGD_class.delta = config["dpOptions"]["epsilon"]
+            DPSGD_class.delta = config["dpOptions"]["delta"]
             labelCol = config["labelColumn"]
         except Exception as err:
             self.log(f"Config file seems to miss fields: {err}")
 
-
+        print(vars(DPSGD_class))
         ### Load in Data
 
         # check if data files exist
