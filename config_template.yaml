@@ -3,7 +3,7 @@ sgdOptions:
     max_iter  : 10 # number of iterations for the local SGD per communication rounds
     lambda_: 0.5 # Regularization parameter lambda
     tolerance: 0.000005
-    L: 10 #Lot size in DPSGD
+    L: 0.1 #Lot size in DPSGD
 
 
 labelColumn: "Chance"
@@ -12,6 +12,6 @@ dpMode: # list, different modes: dpSgd, dpClient, dpCoordinator or null for no d
             # all modes can be combined with each other other
         - "dpSgd"
 dpOptions:
-    epsilon: 10.0
-    delta: 0.0 # if 0 laplace noise, else gauss noise
+    epsilon: 0.9
+    delta: 0.000001 # if 0 laplace noise, else gauss noise
     C: 1 # norm bound
