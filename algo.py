@@ -218,7 +218,7 @@ class LogisticRegression_DPSGD(object):
         """
 
         current_iter = 0
-        gradient = 1
+        mini_batch_gradient = 1
         # self.cost = []
         
         while (current_iter < self.max_iter and np.sqrt(np.sum(mini_batch_gradient ** 2)) > self.tolerance):
