@@ -1,14 +1,24 @@
 """
-This demo implementation works as follows:
-1. The coordinator sends a message to a random participant
-2. The receiver adds it's own ID to the message and sends it again to a random participant
-3. When the message bounced n times (n = number of clients), it's sent to the coordinator with a 'DONE:' prefix
-4. The coordinator stops the "computation"
+Implementation of the logic for private logistic regression
+All logistic regression implementations are found in algo.py
+For configuration options check the config_template.yml
+The states logic for a client is:
+initial
+
+local computation
+obtain weights
+local computation
+...
+...
+The states logic for the coordinator is:
+initial
+
+local computation
+aggregate data
+obtain weights
+local computation
+...
 """
-
-
-
-
 from FeatureCloud.app.engine.app import AppState, app_state, Role, LogLevel
 import algo
 
@@ -32,7 +42,8 @@ class InitialState(AppState):
         self.register_transition("local_computation", Role.BOTH)
 
     def run(self):
-        ### load in config self.internal["epsilon", "delta", ...]
+        ### load in config in self.internal["epsilon", "delta", ...]
+        # load either .yml or .yaml
         if os.path.exists(os.path.join(os.getcwd(), "mnt", "input",
                                        "config.yaml")):
             configFileName = "config.yaml"
@@ -117,12 +128,6 @@ class InitialState(AppState):
             DPSGD_class.L = int(DPSGD_class.L * n)
         # else keep L as it is
 
-        #TODO: rmv
-        print("L is :")
-        print(DPSGD_class.L)
-        print("n is:")
-        print(n)
-
         # modify data depending on which prediction function is used
         # (binary vs multiple classes)
         X, y_train = DPSGD_class.init_theta(X, y_train)
@@ -130,7 +135,6 @@ class InitialState(AppState):
         self.store(key = "y_train", value = y_train)
 
         self.store(key="DPSGD_class", value = DPSGD_class)
-        self.log("Init fc-private-logistic-regression end", level = LogLevel.DEBUG) #TODO: rmv
 
         self.store(key = "cur_computation_round", value = 0)
         return "local_computation"
@@ -171,9 +175,6 @@ class localComputationState(AppState):
         # save theta of each client
         cur_computation_round = self.load("cur_computation_round") + 1
         self.store(key = "cur_computation_round", value = cur_computation_round)
-        fp = open(os.path.join("mnt", "output", "model_{}_{}.pyc".format(
-            self.id, cur_computation_round)), 'wb') #TODO: rmv in Master
-        np.save(fp, DPSGD_class.theta)
 
         # local update
         if self.is_coordinator:
@@ -205,26 +206,12 @@ class aggregateDataState(AppState):
         self.store(key = "cur_communication_round",
                         value = cur_comm)
 
-        #TODO: rmv in master
-        fp = open(os.path.join("mnt", "output", "aggmodel_{}.pyc".format(cur_comm)), "wb")
-        np.save(fp, weights_updated)
-
         if cur_comm >= self.load("config")["communication_rounds"]:
             # finnished
             fp = open(os.path.join("mnt", "output", "trained_model.pyc".format(cur_comm)), "wb")
             np.save(fp, weights_updated)
-
-
-            #TODO: rmv in Master
-            DPSGD_class = self.load("DPSGD_class")
-            DPSGD_class.theta = weights_updated
-            DPSGD_class.evaluate(X = self.load("X_test"), y = self.load("y_test"))
-            # save config (with numClients) #TODO: rmv in Master
-            config = self.load("config")
-            config["numClients"] = len(self.clients)
-            fp = open(os.path.join("mnt", "output", "config.yaml"), "w")
-            yaml.dump(config, fp)
             return "terminal"
+
         else:
             # send data to clients
             self.broadcast_data(weights_updated, send_to_self = True)
