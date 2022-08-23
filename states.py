@@ -18,6 +18,14 @@ aggregate data
 obtain weights
 local computation
 ...
+
+Output is the final model as .pyc file (from numpy array to file)
+The weights in the output model are in the same order as in given training set,
+e.g.
+training set:
+weight, age, gender, chanceOfCancer (Y variable)
+modelweights:
+weight, age, gender
 """
 from FeatureCloud.app.engine.app import AppState, app_state, Role, LogLevel
 import algo
@@ -88,32 +96,28 @@ class InitialState(AppState):
         except Exception as err:
             self.log(f"Config file seems to miss fields: {err}")
 
+        # check for correct privacy parameters
+        if DPSGD_class.epsilon <= 0 or DPSGD_class.epsilon >= 1:
+            self.log("epsilon must be between (0,1)", level = LogLevel.FATAL)
+        if DPSGD_class.delta <= 0:
+            self.log("delta must be between (0,1)", level = LogLevel.FATAL)
+
 
         ### Load in Data
-
         # check if data files exist
         if not os.path.exists(os.path.join(os.getcwd(), "mnt",
                                            "input","training_set.csv")):
             self.log("Could not find training_set.csv containing training data",
                         level = LogLevel.FATAL)
-        if not os.path.exists(os.path.join(os.getcwd(), "mnt",
-                                           "input","test_set.csv")):
-            self.log("Could not find training_set.csv containing test data",
-                        level = LogLevel.FATAL)
 
         # load in data
         train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_set.csv"), index_col=0)
-        test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_set.csv"), index_col=0)
 
         # preprocess data
         X_train = np.array(train_data.drop(columns=[labelCol]))
         X = np.array(X_train)
         y_train = np.array(train_data[labelCol])
 
-        X_test = np.array(test_data.drop(columns=[labelCol]))
-        y_test = np.array(test_data[labelCol])
-        self.store(key = "X_test", value = X_test)
-        self.store(key = "y_test", value = y_test)
 
         # load in weights and other parameters
         n, d = X.shape
