@@ -83,7 +83,7 @@ class InitialState(AppState):
             DPSGD_class.L = config["sgdOptions"]["L"]
             DPSGD_class.C = config["dpOptions"]["C"]
             DPSGD_class.epsilon = config["dpOptions"]["epsilon"]
-            DPSGD_class.delta = config["dpOptions"]["epsilon"]
+            DPSGD_class.delta = config["dpOptions"]["delta"]
             labelCol = config["labelColumn"]
         except Exception as err:
             self.log(f"Config file seems to miss fields: {err}")
