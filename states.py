@@ -51,6 +51,13 @@ class InitialState(AppState):
             self.log(f"Error loading config.yaml: f{err}",
                      level = LogLevel.FATAL)
 
+        # save config (with numClients) #TODO: rmv in Master
+        if self.is_coordinator:
+            config["numClients"] = len(self.clients)
+            fp = open(os.path.join("mnt", "output", "config.yaml"), "w")
+            yaml.dump(config, fp)
+
+
         self.store(key = "config", value = config)
 
         if self.is_coordinator:
@@ -75,8 +82,18 @@ class InitialState(AppState):
             DPSGD_class.delta = config["dpOptions"]["delta"]
             labelCol = config["labelColumn"]
         except Exception as err:
-            self.log(f"Config file seems to miss fields: {err}")
+            self.log(f"Config file seems to miss fields: {err}",
+                     level = LogLevel.FATAL)
 
+        #TODO add outputDP here as well
+        if DPSGD_class.DP:
+            if DPSGD_class.delta < 0 or DPSGD_class.delta >= 1:
+                self.log("delta must be [0,1)",
+                         level = LogLevel.FATAL)
+            elif DPSGD_class.delta != 0 and DPSGD_class.epsilon >= 1:
+                self.log("When delta is >= 0, gauss noise is used. " +\
+                    "For gauss noise, epsilon must be between 0 and 1",
+                    level = LogLevel.FATAL)
         print(vars(DPSGD_class))
         ### Load in Data
 
@@ -91,8 +108,8 @@ class InitialState(AppState):
                         level = LogLevel.FATAL)
 
         # load in data
-        train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_set.csv"), index_col=0)
-        test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_set.csv"), index_col=0)
+        train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_set.csv"))
+        test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_set.csv"))
 
         # preprocess data
         X_train = np.array(train_data.drop(columns=[labelCol]))
@@ -198,9 +215,6 @@ class aggregateDataState(AppState):
         self.store(key = "cur_communication_round",
                         value = cur_comm)
 
-        fp = open(os.path.join("mnt", "output", "aggmodel_{}.pyc".format(cur_comm)), "wb")
-        np.save(fp, weights_updated)
-
         if cur_comm >= self.load("config")["communication_rounds"]:
             # finnished
             fp = open(os.path.join("mnt", "output", "trained_model.pyc".format(cur_comm)), "wb")
@@ -208,14 +222,26 @@ class aggregateDataState(AppState):
 
             DPSGD_class = self.load("DPSGD_class")
             DPSGD_class.theta = weights_updated
-            DPSGD_class.evaluate(X = self.load("X_test"), y = self.load("y_test"))
-            # save config (with numClients) #TODO: rmv in Master
+            acc, confMat = DPSGD_class.evaluate(X = self.load("X_test"),
+                                                y = self.load("y_test"))
+
+
+            # write evaluation results in output #TODO remove this from master
             config = self.load("config")
-            config["numClients"] = len(self.clients)
+            config["accuracy"] = acc.item()
+            config["conf_matrix"] = confMat.tolist()
+
+
+            # overwrite config file output
             fp = open(os.path.join("mnt", "output", "config.yaml"), "w")
             yaml.dump(config, fp)
+
             return "terminal"
         else:
+            # save agg_model
+            fp = open(os.path.join("mnt", "output", "aggmodel_{}.pyc".format(cur_comm)), "wb")
+            np.save(fp, weights_updated)
+
             # send data to clients
             self.broadcast_data(weights_updated, send_to_self = True)
             return "obtain_weights"
