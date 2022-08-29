@@ -327,8 +327,7 @@ class LogisticRegression_DPSGD(object):
 
         accuracy = accuracy_score(y, y_pred_target,normalize=True)
         conf_mat = confusion_matrix(y, y_pred_target)
-        print("The accuracy of the model :", round(accuracy,3)*100,"%")
-        print("Confusion Matrix:\n",conf_mat)
+        return accuracy, conf_mat
 
     def noise_from_epsilon(self, X):
         """
