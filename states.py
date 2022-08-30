@@ -9,7 +9,7 @@ This demo implementation works as follows:
 
 
 
-from FeatureCloud.app.engine.app import AppState, app_state, Role, LogLevel
+from FeatureCloud.app.engine.app import AppState, app_state, Role, DPNoisetype, LogLevel
 import algo
 
 import os
@@ -26,7 +26,8 @@ import random
 @app_state("initial")
 class InitialState(AppState):
     """
-    Loads in data to the AppState as well as necessary hyperparameters from config.yaml
+    Loads in data to the AppState as well as necessary hyperparameters from
+    config.yaml
     """
     def register(self):
         self.register_transition("local_computation", Role.BOTH)
@@ -57,18 +58,27 @@ class InitialState(AppState):
             fp = open(os.path.join("mnt", "output", "config.yaml"), "w")
             yaml.dump(config, fp)
 
-        self.store(key = "config", value = config)
-
         if self.is_coordinator:
             self.store(key = "cur_communication_round", value = 0)
 
         ### SGD Class creation
         DPSGD_class = algo.LogisticRegression_DPSGD()
         # DP information
-        if "DPSGD" in [x.upper() for x in config["dpMode"]]:
-            DPSGD_class.DP = True
-        else:
-            DPSGD_class.DP = False
+        if "dpMode" not in config:
+            self.log("Error, config files contains no DP information, " +\
+                     "if no DP is wanted, please set dpMode to none",
+                    level = LogLevel.FATAL)
+
+        if config["dpMode"]:
+            if "DPSGD" in [x.upper() for x in config["dpMode"]]:
+                DPSGD_class.DP = True
+            else:
+                DPSGD_class.DP = False
+
+            if "dpClient" in [x.upper() for x in config["dpMode"]]:
+                dpClient = True
+            else:
+                dpClient = False
 
         try:
             DPSGD_class.alpha = config["sgdOptions"]["alpha"]
@@ -84,18 +94,34 @@ class InitialState(AppState):
             self.log(f"Config file seems to miss fields: {err}",
                      level = LogLevel.FATAL)
 
-        #TODO add outputDP here as well
-        if DPSGD_class.DP:
+        # More dp related configuration
+        if DPSGD_class.DP or dpClient:
+            # check if epsilon and delta are ok
             if DPSGD_class.delta < 0 or DPSGD_class.delta >= 1:
                 self.log("delta must be [0,1)",
+                         level = LogLevel.FATAL)
+            elif DPSGD_class.epsilon <= 0:
+                self.log("epsilon must be > 0",
                          level = LogLevel.FATAL)
             elif DPSGD_class.delta != 0 and DPSGD_class.epsilon >= 1:
                 self.log("When delta is >= 0, gauss noise is used. " +\
                     "For gauss noise, epsilon must be between 0 and 1",
                     level = LogLevel.FATAL)
-        print(vars(DPSGD_class))
-        ### Load in Data
 
+            # configure DP for dpClient
+            if DPSGD_class.delta != 0:
+                noisetype = DPNoisetype.GAUSS
+            else:
+                noisetype = DPNoisetype.LAPLACE
+            self.configure_dp(epsilon = DPSGD_class.epsilon,
+                              delta =  DPSGD_class.delta,
+                              sensitivity = lambda_ * 2.0,
+                              clippingVal = None,
+                              noisetype = noisetype)
+            self.store(key = "dpClient", value = dpClient)
+
+
+        ### Load in Data
         # check if data files exist
         if not os.path.exists(os.path.join(os.getcwd(), "mnt",
                                            "input","training_set.csv")):
@@ -107,8 +133,10 @@ class InitialState(AppState):
                         level = LogLevel.FATAL)
 
         # load in data
-        train_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","training_set.csv"))
-        test_data = pd.read_csv(os.path.join(os.getcwd(), "mnt", "input","test_set.csv"))
+        train_data = pd.read_csv(os.path.join(os.getcwd(),
+                                            "mnt", "input","training_set.csv"))
+        test_data = pd.read_csv(os.path.join(os.getcwd(),
+                                            "mnt", "input","test_set.csv"))
 
         # preprocess data
         X_train = np.array(train_data.drop(columns=[labelCol]))
@@ -117,6 +145,7 @@ class InitialState(AppState):
 
         X_test = np.array(test_data.drop(columns=[labelCol]))
         y_test = np.array(test_data[labelCol])
+
         self.store(key = "X_test", value = X_test)
         self.store(key = "y_test", value = y_test)
 
@@ -136,6 +165,7 @@ class InitialState(AppState):
         # modify data depending on which prediction function is used
         # (binary vs multiple classes)
         X, y_train = DPSGD_class.init_theta(X, y_train)
+
         self.store(key = "X", value = X)
         self.store(key = "y_train", value = y_train)
 
@@ -154,7 +184,9 @@ class obtainWeights(AppState):
     def run(self):
         # update from broadcast_data
         DPSGD_class = self.load("DPSGD_class")
-        DPSGD_class.theta = self.await_data(n = 1, unwrap=True, is_json=False)
+        DPSGD_class.theta = np.array(self.await_data(n = 1, unwrap=False,
+                                                     is_json=False)).reshape(
+                                        self.load("shapeTheta"))
         self.store(key="DPSGD_class", value = DPSGD_class)
         return "local_computation"
 
@@ -185,14 +217,22 @@ class localComputationState(AppState):
             self.id, cur_computation_round)), 'wb')
         np.save(fp, DPSGD_class.theta)
 
+        if self.load("dpClient"):
+            # necessary or json cant handle the ndarray
+            DPSGD_class.theta = DPSGD_class.theta.tolist()
+
         # local update
         if self.is_coordinator:
             self.send_data_to_coordinator(DPSGD_class.theta,
-                                          send_to_self = True, use_smpc = False)
+                                          send_to_self = True,
+                                          use_smpc = False,
+                                          use_dp = self.load("dpClient"))
             return "aggregate_data"
         else:
             self.send_data_to_coordinator(DPSGD_class.theta,
-                                        send_to_self = False, use_smpc = False)
+                                          send_to_self = False,
+                                          use_smpc = False,
+                                          use_dp = self.load("dpClient"))
             return "obtain_weights"
 
 

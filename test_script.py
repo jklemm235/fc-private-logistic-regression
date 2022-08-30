@@ -213,7 +213,7 @@ if __name__ == "__main__":
   parser.add_argument("-l", "--label-column", dest="label", nargs = 1,
                       help = "Name of the column to be predicted, " +\
                       "(y column), use target for iris", required = True)
-  parser.add_argument("-dp", "--dp-mode", choices = ["dpSGD", "OutputDP", "noDP"],
+  parser.add_argument("-dp", "--dp-mode", choices = ["dpSGD", "dpClient", "noDP"],
                       nargs = 1, dest="dp", default = ["dpSGD"],
                       help = "Where to add DP, either during " + \
                       "stochastic gradient descent, during aggregation or no " \
