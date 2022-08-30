@@ -17,7 +17,7 @@ import time
 # delta is set in main as 1 / (databasesize*10)
 config_base = {"sgdOptions":
                 {"alpha":  0.01,
-                 "max_iter": 1, #TODO: change back to 1000
+                 "max_iter": 100, #TODO: change back to 1000
                  "lambda_": 0.5,
                  "tolerance": 0.000005,
                  "L": 0.5},
@@ -49,19 +49,21 @@ def TESTING(dfTotal, locationfolder, port):
     print(f"Starting Fold {curFold}")
     # TEST number clients
     print("Running test number clients:")
-    testNumClients = [2] #[1, 2, 4, 8, 12, 16, 24, 32]
+    # Warning, for iris, don't use more than 12 clients, the dataset is too
+    # small
+    testNumClients = [1] #[1, 2, 4, 8, 12, 16, 24, 32]
     print("numClients checked = {}".format(testNumClients))
     config_running = config_base.copy()
     for numClients in testNumClients:
         run_test(config_running, dfTrain, dfTest, locationfolder, port,
                 numClients = numClients, dataDistribution = None,
                 resetClientDirs = True)
-    print("______________________________________________________")
-    #TODO: remove
+    #TODO: rmv this
     exit()
+    print("______________________________________________________")
     # TEST number aggregation rounds (communication_rounds)
     print("Running test number communication_rounds:")
-    testComRounds = [1] #[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+    testComRounds = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
     print("com_rounds checked = {}".format(testComRounds))
     for com_rounds in testComRounds:
       config_running = config_base.copy()
@@ -73,7 +75,7 @@ def TESTING(dfTotal, locationfolder, port):
 
     # TEST sample size (L)
     print("Running test samplingRatio:")
-    testSamplingRatio = [0.01] #[0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, None]
+    testSamplingRatio = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, None]
     print("samplingRatio checked = {}".format(testSamplingRatio))
     for samplingRatio in testSamplingRatio:
       config_running = config_base.copy()
@@ -85,7 +87,7 @@ def TESTING(dfTotal, locationfolder, port):
 
     # TEST epsilon, using gauss noise
     print("Running test epsilon")
-    testEpsilon = [0.001] #[0.001, 0.01, 0.1, 0.2, 0.4, 0.8]
+    testEpsilon = [0.001, 0.01, 0.1, 0.2, 0.4, 0.8]
     print("epsilon checked = {}".format(testEpsilon))
     for epsilon in testEpsilon:
       config_running = config_base.copy()
@@ -270,6 +272,11 @@ if __name__ == "__main__":
 
   TESTING(dfTotal, locationfolder, port)
 
+  # check if any errors and report
+  listoutput = os.popen("featurecloud test list").read()
+  if "error" in listoutput:
+    print("WARNING: The controller session seems to contain at least one " +\
+          "ERROR, check the logs and run featurecloud test list to see more")
 
 
 

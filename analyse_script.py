@@ -75,20 +75,32 @@ if __name__ == "__main__":
             outList[i][key] = val
         outList[i].pop("sgdOptions", None)
 
-    # get headers
+    # get headers, eliminate errorous runs
+    err_ind = list()
     headers = outList[0].keys()
-    for nextHeader in outList[1:]:
+    for idx, nextHeader in enumerate(outList[1:]):
+        if "status" not in nextHeader or nextHeader["status"] != "finished":
+            err_ind.append(idx + 1)
+            continue
         nextHeader = nextHeader.keys()
         if headers != nextHeader:
-            raise Exception("ERROR, config output files were different over " +\
+            raise Exception(
+                "ERROR, config output files were different over " +\
                 "different test runs, redo tests or a csv output cannot be " +\
                 "generated")
+
+    if len(err_ind) > 0:
+        print("The following test runs did not run correctly:")
+        for idx in err_ind:
+            print(outList[idx])
 
     # write lines
     with open(os.path.join(outputDir, "analysis.csv"), "w") as csvOut:
         csvOut.write(','.join(headers) + '\n')
-        for outDict in outList:
-            csvOut.write(','.join([str(x) for x in outDict.values()]) + '\n')
+        for idx, outDict in enumerate(outList):
+            if idx not in err_ind:
+                csvOut.write(','.join([str(x) for x in outDict.values()]) +\
+                            '\n')
 
 
 

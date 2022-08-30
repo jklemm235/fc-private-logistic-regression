@@ -57,7 +57,6 @@ class InitialState(AppState):
             fp = open(os.path.join("mnt", "output", "config.yaml"), "w")
             yaml.dump(config, fp)
 
-
         self.store(key = "config", value = config)
 
         if self.is_coordinator:
@@ -143,6 +142,7 @@ class InitialState(AppState):
         self.store(key="DPSGD_class", value = DPSGD_class)
 
         self.store(key = "cur_computation_round", value = 0)
+
         return "local_computation"
 
 @app_state("obtain_weights")
@@ -230,6 +230,7 @@ class aggregateDataState(AppState):
             config = self.load("config")
             config["accuracy"] = acc.item()
             config["conf_matrix"] = confMat.tolist()
+            config["status"] = "finished"
 
 
             # overwrite config file output
