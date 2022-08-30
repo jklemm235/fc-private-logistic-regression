@@ -75,7 +75,7 @@ class InitialState(AppState):
             else:
                 DPSGD_class.DP = False
 
-            if "dpClient" in [x.upper() for x in config["dpMode"]]:
+            if "DPCLIENT" in [x.upper() for x in config["dpMode"]]:
                 dpClient = True
             else:
                 dpClient = False
@@ -109,15 +109,18 @@ class InitialState(AppState):
                     level = LogLevel.FATAL)
 
             # configure DP for dpClient
-            if DPSGD_class.delta != 0:
-                noisetype = DPNoisetype.GAUSS
-            else:
-                noisetype = DPNoisetype.LAPLACE
-            self.configure_dp(epsilon = DPSGD_class.epsilon,
-                              delta =  DPSGD_class.delta,
-                              sensitivity = lambda_ * 2.0,
-                              clippingVal = None,
-                              noisetype = noisetype)
+            if dpClient:
+                if DPSGD_class.delta != 0:
+                    noisetype = DPNoisetype.GAUSS
+                else:
+                    noisetype = DPNoisetype.LAPLACE
+                epsilon = DPSGD_class.epsilon / config["communication_rounds"]
+                delta = DPSGD_class.delta / config["communication_rounds"]
+                self.configure_dp(epsilon = epsilon,
+                                delta =  delta,
+                                sensitivity = DPSGD_class.lambda_ * 2.0,
+                                clippingVal = None,
+                                noisetype = noisetype)
             self.store(key = "dpClient", value = dpClient)
 
 
@@ -172,6 +175,7 @@ class InitialState(AppState):
         self.store(key="DPSGD_class", value = DPSGD_class)
 
         self.store(key = "cur_computation_round", value = 0)
+        self.store(key = "config", value = config)
 
         return "local_computation"
 
@@ -184,9 +188,8 @@ class obtainWeights(AppState):
     def run(self):
         # update from broadcast_data
         DPSGD_class = self.load("DPSGD_class")
-        DPSGD_class.theta = np.array(self.await_data(n = 1, unwrap=False,
-                                                     is_json=False)).reshape(
-                                        self.load("shapeTheta"))
+        DPSGD_class.theta = np.array(self.await_data(n = 1, unwrap=True,
+                                                     is_json=False))
         self.store(key="DPSGD_class", value = DPSGD_class)
         return "local_computation"
 
@@ -201,8 +204,6 @@ class localComputationState(AppState):
         # Set parameter
         X = self.load("X")
         y = self.load("y_train")
-        n = self.load("n")
-        d = self.load("d")
 
         # Training
         DPSGD_class = self.load("DPSGD_class")
@@ -247,7 +248,8 @@ class aggregateDataState(AppState):
 
     def run(self):
         # aggregate the weights
-        weights_updated = self.aggregate_data(use_smpc=False)
+        weights_updated = self.aggregate_data(use_smpc=False,
+                                              use_dp=self.load("dpClient"))
         weights_updated = weights_updated / len(self._app.clients)
 
         # update communication_rounds

@@ -51,7 +51,7 @@ def TESTING(dfTotal, locationfolder, port):
     print("Running test number clients:")
     # Warning, for iris, don't use more than 12 clients, the dataset is too
     # small
-    testNumClients = [1] #[1, 2, 4, 8, 12, 16, 24, 32]
+    testNumClients = [2] #[1, 2, 4, 8, 12, 16, 24, 32]
     print("numClients checked = {}".format(testNumClients))
     config_running = config_base.copy()
     for numClients in testNumClients:
@@ -59,7 +59,8 @@ def TESTING(dfTotal, locationfolder, port):
                 numClients = numClients, dataDistribution = None,
                 resetClientDirs = True)
     #TODO: rmv this
-    exit()
+    return None
+
     print("______________________________________________________")
     # TEST number aggregation rounds (communication_rounds)
     print("Running test number communication_rounds:")
@@ -191,7 +192,8 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
   # check if test is done
   time.sleep(10) # wait before checking if test is still running to let
   while True:
-    listoutput = os.popen("featurecloud test list").read()
+    listoutput = os.popen("featurecloud test list " +\
+      "--controller-host=http://localhost:{} ".format(port)).read()
     if not "running" in listoutput and not "init" in listoutput:
       break
     time.sleep(5)
@@ -273,7 +275,8 @@ if __name__ == "__main__":
   TESTING(dfTotal, locationfolder, port)
 
   # check if any errors and report
-  listoutput = os.popen("featurecloud test list").read()
+  listoutput = os.popen("featurecloud test list " +\
+      "--controller-host=http://localhost:{} ".format(port)).read()
   if "error" in listoutput:
     print("WARNING: The controller session seems to contain at least one " +\
           "ERROR, check the logs and run featurecloud test list to see more")
