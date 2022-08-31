@@ -17,7 +17,7 @@ import time
 # delta is set in main as 1 / (databasesize*10)
 config_base = {"sgdOptions":
                 {"alpha":  0.01,
-                 "max_iter": 100, #TODO: change back to 1000
+                 "max_iter": 1, #TODO: change back to 1000
                  "lambda_": 0.5,
                  "tolerance": 0.000005,
                  "L": 0.5},
@@ -228,6 +228,9 @@ if __name__ == "__main__":
   parser.add_argument("-p", "--port-controller", dest="port", nargs = 1,
                       default=[8000], help="Port of the fc-controller, " +\
                         "usually 8000 or 8002")
+  parser.add_argument("-o", "--output", required = True, dest = "output",
+                      nargs = 1, help = "Folder in which to write the data " +\
+                      "after shuffling")
   args = parser.parse_args()
 
   ##### change config_base ####
@@ -265,7 +268,7 @@ if __name__ == "__main__":
   dfTotal = dfTotal.sample(frac = 1.0, random_state = 42)
 
   # make dir for output
-  outputDir = os.path.join(os.getcwd(), "outputTestScript")
+  outputDir = os.path.join(os.getcwd(), args.output[0])
   if not os.path.isdir(outputDir):
     os.mkdir(outputDir)
 
