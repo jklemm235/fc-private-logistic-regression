@@ -222,23 +222,20 @@ class LogisticRegression_DPSGD(object):
         # self.cost = []
         
         while (current_iter < self.max_iter and np.sqrt(np.sum(mini_batch_gradient ** 2)) > self.tolerance):
+            randomized_samples = random.sample(range(0,X.shape[0]), self.L) #randomly select the lot/batch with probability L/n, n = X.shape[0]
+            lots_gradients = []
+            for i in randomized_samples:
+                x_sample = X[i]
+                y_sample = y[i]
+                error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
+                gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
+                lots_gradients.append(gradient)
 
-            for epoch in range(int(X.shape[0]/self.L)):
-                randomized_samples = random.sample(range(0,X.shape[0]), self.L) #randomly select the lot/batch with probability L/n, n = X.shape[0]
-
-                lots_gradients = []
-                for i in randomized_samples:
-                    x_sample = X[i]
-                    y_sample = y[i]
-                    error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
-                    gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
-                    lots_gradients.append(gradient)
-
-                mini_batch_gradient = np.sum(lots_gradients, axis=0) / self.L
-                self.theta = self.theta - self.alpha * mini_batch_gradient
+            mini_batch_gradient = np.sum(lots_gradients, axis=0) / self.L
+            self.theta = self.theta - self.alpha * mini_batch_gradient
 
             current_iter += 1
-            # self.cost.append(self.logLiklihood_loss(X, y))
+        # self.cost.append(self.logLiklihood_loss(X, y))
 
 
     def DP_SGD(self, X, y):
@@ -261,25 +258,23 @@ class LogisticRegression_DPSGD(object):
         # self.cost = []
         
         while (current_iter < self.max_iter and np.sqrt(np.sum(noisy_gradient ** 2)) > self.tolerance):
+            randomized_samples = random.sample(range(0,X.shape[0]), self.L) #randomly select the lot/batch with probability L/n, n = X.shape[0]
 
-            for epoch in range(int(X.shape[0]/self.L)):
-                randomized_samples = random.sample(range(0,X.shape[0]), self.L) #randomly select the lot/batch with probability L/n, n = X.shape[0]
+            lots_gradients = []
+            for i in randomized_samples:
+                x_sample = X[i]
+                y_sample = y[i]
+                error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
+                gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
+                # clip the gradient
+                gradient_norm = math.sqrt(np.sum(gradient ** 2))
+                gradient_clip = gradient / max(1, gradient_norm / self.C)
+                lots_gradients.append(gradient_clip)
 
-                lots_gradients = []
-                for i in randomized_samples:
-                    x_sample = X[i]
-                    y_sample = y[i]
-                    error = self.pred_func(np.dot(x_sample.reshape(-1,self.theta.shape[0]),self.theta)) - y_sample
-                    gradient = x_sample.reshape(-1,error.shape[0]).dot(np.array(error))+ self.lambda_ * self.theta
-                    # clip the gradient
-                    gradient_norm = math.sqrt(np.sum(gradient ** 2))
-                    gradient_clip = gradient / max(1, gradient_norm / self.C)
-                    lots_gradients.append(gradient_clip)
-
-                # add noise
-                noise = np.random.normal(loc=0,scale=self.C*self.sigma,size=self.theta.shape)
-                noisy_gradient = (np.sum(lots_gradients, axis=0) + noise) / self.L
-                self.theta = self.theta - self.alpha * noisy_gradient
+            # add noise
+            noise = np.random.normal(loc=0,scale=self.C*self.sigma,size=self.theta.shape)
+            noisy_gradient = (np.sum(lots_gradients, axis=0) + noise) / self.L
+            self.theta = self.theta - self.alpha * noisy_gradient
 
             current_iter += 1
             # self.cost.append(self.logLiklihood_loss(X, y))
