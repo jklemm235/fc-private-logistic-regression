@@ -23,12 +23,12 @@ import pandas as pd
 # delta is set in main as 1 / (databasesize*10)
 config_base = {"sgdOptions":
                 {"alpha":  0.001,
-                 "max_iter": 100,
+                 "max_iter": 500,
                  "lambda_": 10e-4,
                  "tolerance": 10e-6,
                  "L": 0.2},
                 "labelColumn": None,
-                "communication_rounds": 5,
+                "communication_rounds": 1,
                 "dpMode": [],
                 "dpOptions":
                   {"epsilon":  0.1,
@@ -66,7 +66,6 @@ def TESTING(dfTotal, locationfolder, port):
         testnumsList = testnumsList + run_test(config_running, dfTrain, dfTest,
                               locationfolder, port, numClients = numClients,
                               dataDistribution = None, resetClientDirs = True)
-        print(testnumsList)
     continue # first batch of tests
 
     print("______________________________________________________")
@@ -138,7 +137,6 @@ def fold_generator(df):
 def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
              dataDistribution = None, resetClientDirs = False,
              num_redos = 5):
-  #TODO: remove testnumList
   print("Running a test")
   #Save and print noise used for dp client
   if "DPCLIENT" in [x.upper() for x in configDict["dpMode"]]:
@@ -227,9 +225,11 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
           range(numClients)])) +\
         "--generic-dir=./ --app-image=fc-private-logistic-regression " +\
         "--channel=local --query-interval=2 --download-results=./output")
-    m = re.match("^Test id=(\d+) started$", startoutput.read())
+    startoutput = startoutput.read()
+    m = re.match("^Test id=(\d+) started$", startoutput)
     if not m:
-      raise Exception("A test could not be started, ERROR")
+      raise Exception("A test could not be started, ERROR: {}".format(
+                    startoutput))
     testnumsList.append(int(m.group(1)))
     # check if test is done
     time.sleep(5) # wait before checking if test is still running to let
@@ -281,6 +281,7 @@ if __name__ == "__main__":
   ##### change config_base ####
   # load in dpMode
   config_base["dpMode"] = args.dp
+  starttime = time.time()
 
   # read in data
   datafolder = args.data[0]
@@ -321,7 +322,6 @@ if __name__ == "__main__":
 
   if not args.analyse:
     testnumsList = TESTING(dfTotal, locationfolder, port)
-    print(testnumsList) #TODO rmv this print
     # check if any errors and report
     listoutput = os.popen("featurecloud test list " +\
         "--controller-host=http://localhost:{} ".format(port)).read()
@@ -339,12 +339,13 @@ if __name__ == "__main__":
       testnum = m.group(1)
       clientnum = m.group(2)
       testID = m.group(3)
+      testIdent = str(testnum) + "_" + str(testID)
       #TODO implement getting of only test specific data via
       # os.path.getmtime(path)
       # and if not current, continue
+      curModelOutDir = os.path.join(outputDir, "test_{}".format(testIdent))
       if not os.path.isdir(curModelOutDir):
         os.mkdir(curModelOutDir)
-      clientnum = m.group(2)
       with zipfile.ZipFile(zipout, "r") as zippyfile:
         for outputFile in zippyfile.namelist():
             if outputFile[-4:] == ".pyc":
@@ -352,7 +353,7 @@ if __name__ == "__main__":
             elif outputFile == "config.yml" or \
                   outputFile == "config.yaml":
               config = yaml.safe_load(zippyfile.read(outputFile))
-              config["testnum"] = testnum
+              config["testnum"] = testIdent
               outList.append(config)
 
   # write csv
@@ -378,18 +379,19 @@ if __name__ == "__main__":
   # get headers, eliminate errorous runs
   err_ind = list()
   headers = outList[0].keys()
-  #TODO check if headers same as cur analysis file
+
   if dfAnalysis:
     print(dfAnalysis.columns)
     if dfAnalysis.columns != headers:
-      exit() #TODO: change this to raise
+      raise Exception("analysis.csv file contains other header then newly " +\
+        "created tests")
 
   for idx, nextHeader in enumerate(outList[1:]):
     if "status" not in nextHeader or nextHeader["status"] != "finished":
       err_ind.append(idx + 1)
       continue
-    nextHeader = nextHeader.keys()
-    if headers != nextHeader:
+    if headers != nextHeader.keys():
+      print("ERROR: in test: {}".format(nextHeader))
       raise Exception(
             "ERROR, config output files were different over " +\
             "different test runs, redo tests or a csv output cannot be " +\
