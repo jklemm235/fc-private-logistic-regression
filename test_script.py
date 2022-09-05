@@ -13,6 +13,7 @@ import re
 import zipfile
 import pandas as pd
 
+
 ##### Starting point of any test done #####
 # NOTE: DO NOT USE sgdOptions.L = 1 if you want to consider ALL data,
 # all values under 1 get seen as percentage, but 1 gets seen as just use one
@@ -49,14 +50,9 @@ def TESTING(dfTotal, locationfolder, port):
   curFold = 0
   testnumsList = list() # needed in analysis, fill with results of run_test
   for dfTest, dfPrivacytest, dfTrain, foldInfoDict in fold_generator(dfTotal):
-    #TODO: use fold again
-    dfTest = dfTotal.iloc[0:30]
-    dfTrain = dfTotal.iloc[30:]
-    #TODO: use fold again
-
+    #TODO: remove testnumlist
     curFold += 1
     config_base.update(foldInfoDict)
-
 
     print(f"Starting Fold {curFold}")
     # TEST number clients
@@ -142,6 +138,7 @@ def fold_generator(df):
 def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
              dataDistribution = None, resetClientDirs = False,
              num_redos = 5):
+  #TODO: remove testnumList
   print("Running a test")
   #Save and print noise used for dp client
   if "DPCLIENT" in [x.upper() for x in configDict["dpMode"]]:
@@ -276,6 +273,9 @@ if __name__ == "__main__":
                         "usually 8000 or 8002")
   parser.add_argument("-o", "--output", required = True, dest = "output",
                       nargs = 1, help = "Folder in which to write results")
+  parser.add_argument('--analyse-all', help = 'skips testing and analyses ' +\
+                      'everything found in the controllerdata/tests/output',
+                     action = "store_true", default = False, dest = "analyse")
   args = parser.parse_args()
 
   ##### change config_base ####
@@ -305,61 +305,55 @@ if __name__ == "__main__":
     exit()
   port = args.port[0]
 
-  print("Starting tests with the following baseline:")
-  print(config_base)
-  print("numClients: {}".format(numClientsDefault))
-  print("______________________________________________________")
-  buildoutput = os.popen('sh build.sh')
-  print(buildoutput.read())
-  print("______________________________________________________")
+  if not args.analyse:
+    print("Starting tests with the following baseline:")
+    print(config_base)
+    print("numClients: {}".format(numClientsDefault))
+    print("______________________________________________________")
+    buildoutput = os.popen('sh build.sh')
+    print(buildoutput.read())
+    print("______________________________________________________")
 
   # make dir for output
   outputDir = os.path.join(os.getcwd(), args.output[0])
   if not os.path.isdir(outputDir):
     os.mkdir(outputDir)
 
-  testnumsList = TESTING(dfTotal, locationfolder, port)
-  print(testnumsList) #TODO rmv this print
-  # check if any errors and report
-  listoutput = os.popen("featurecloud test list " +\
-      "--controller-host=http://localhost:{} ".format(port)).read()
-  if "error" in listoutput:
-    print("WARNING: The controller session seems to contain at least one " +\
-          "ERROR, check the logs and run featurecloud test list to see more")
+  if not args.analyse:
+    testnumsList = TESTING(dfTotal, locationfolder, port)
+    print(testnumsList) #TODO rmv this print
+    # check if any errors and report
+    listoutput = os.popen("featurecloud test list " +\
+        "--controller-host=http://localhost:{} ".format(port)).read()
+    if "error" in listoutput:
+      print("WARNING: The controller session seems to contain at least one " +\
+            "ERROR, check the logs and run featurecloud test list to see more")
 
-  time.sleep(30) # wait for results to be saved
-
-  analysisCSVPath = os.path.join(outputDir, "analysis.csv")
-  offset_testnum = 0
-  dfAnalysis = None
-  outList = list()
-  if os.path.exists(analysisCSVPath):
-    dfAnalysis = pd.read_csv(analysisCSVPath)
-    offset_testnum = dfAnalysis["testnum"].max()
-
+    time.sleep(30) # wait for results to be saved
 
   # get models into the output folder and read in config files
   for zipout in os.listdir(locationfolder):
-    m = re.match("^results_test_(\d+)_client_(\d+)_.*\.zip$", zipout)
+    m = re.match("^results_test_(\d+)_client_(\d+)_[a-zA-Z]+_(\d+)\.zip$", zipout)
     if m:
       zipout = os.path.join(locationfolder, zipout)
-      testnum = int(m.group(1))
-      if testnum in testnumsList:
-        testnum += offset_testnum
-        curModelOutDir = os.path.join(outputDir, "models_testnum_{}".format(
-                                        testnum))
-        if not os.path.isdir(curModelOutDir):
-          os.mkdir(curModelOutDir)
-        clientnum = m.group(2)
-        with zipfile.ZipFile(zipout, "r") as zippyfile:
-          for outputFile in zippyfile.namelist():
-              if outputFile[-4:] == ".pyc":
-                zippyfile.extract(outputFile, path=curModelOutDir)
-              elif outputFile == "config.yml" or \
-                    outputFile == "config.yaml":
-                config = yaml.safe_load(zippyfile.read(outputFile))
-                config["testnum"] = testnum
-                outList.append(config)
+      testnum = m.group(1)
+      clientnum = m.group(2)
+      testID = m.group(3)
+      #TODO implement getting of only test specific data via
+      # os.path.getmtime(path)
+      # and if not current, continue
+      if not os.path.isdir(curModelOutDir):
+        os.mkdir(curModelOutDir)
+      clientnum = m.group(2)
+      with zipfile.ZipFile(zipout, "r") as zippyfile:
+        for outputFile in zippyfile.namelist():
+            if outputFile[-4:] == ".pyc":
+              zippyfile.extract(outputFile, path=curModelOutDir)
+            elif outputFile == "config.yml" or \
+                  outputFile == "config.yaml":
+              config = yaml.safe_load(zippyfile.read(outputFile))
+              config["testnum"] = testnum
+              outList.append(config)
 
   # write csv
   # remove unnecessary entries from the dicts in outList
