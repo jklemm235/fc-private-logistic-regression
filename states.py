@@ -52,6 +52,7 @@ class InitialState(AppState):
             self.log(f"Error loading config.yaml: f{err}",
                      level = LogLevel.FATAL)
 
+
         # save config (with numClients) #TODO: rmv in Master
         if self.is_coordinator:
             config["numClients"] = len(self.clients)
@@ -108,22 +109,6 @@ class InitialState(AppState):
                     "For gauss noise, epsilon must be between 0 and 1",
                     level = LogLevel.FATAL)
 
-            # configure DP for dpClient
-            if dpClient:
-                if DPSGD_class.delta != 0:
-                    noisetype = DPNoisetype.GAUSS
-                else:
-                    noisetype = DPNoisetype.LAPLACE
-                epsilon = DPSGD_class.epsilon / config["communication_rounds"]
-                delta = DPSGD_class.delta / config["communication_rounds"]
-                self.configure_dp(epsilon = epsilon,
-                                delta =  delta,
-                                sensitivity = DPSGD_class.lambda_ * 2.0,
-                                clippingVal = None,
-                                noisetype = noisetype)
-            self.store(key = "dpClient", value = dpClient)
-
-
         ### Load in Data
         # check if data files exist
         if not os.path.exists(os.path.join(os.getcwd(), "mnt",
@@ -160,14 +145,36 @@ class InitialState(AppState):
         if not DPSGD_class.L:
             # use all data if L = nil was given
             DPSGD_class.L = n
+            sampleRatio = 1
         elif DPSGD_class.L < 1:
             # change L to the correct value if L is a percentage
+            sampleRatio = DPSGD_class.L
             DPSGD_class.L = int(DPSGD_class.L * n)
+
         # else keep L as it is
 
         # modify data depending on which prediction function is used
         # (binary vs multiple classes)
         X, y_train = DPSGD_class.init_theta(X, y_train)
+
+        ### configure DP for dpClient
+        if dpClient:
+            if DPSGD_class.delta != 0:
+                noisetype = DPNoisetype.GAUSS
+            else:
+                noisetype = DPNoisetype.LAPLACE
+            epsilon = DPSGD_class.epsilon / config["communication_rounds"]
+            delta = DPSGD_class.delta / config["communication_rounds"]
+            self.configure_dp(epsilon = epsilon,
+                            delta =  delta,
+                            sensitivity = \
+                                DPSGD_class.lambda_ * 2.0,
+                            clippingVal = None,
+                            noisetype = noisetype)
+
+        self.store(key = "dpClient", value = dpClient)
+
+
 
         self.store(key = "X", value = X)
         self.store(key = "y_train", value = y_train)
@@ -209,6 +216,11 @@ class localComputationState(AppState):
         DPSGD_class = self.load("DPSGD_class")
         DPSGD_class.train(X, y)
         self.store(key="DPSGD_class", value = DPSGD_class)
+        #TODO: remove
+        print("locally trained model:")
+        print(DPSGD_class.theta)
+        print("DPSGD_class used for training:")
+        print(vars(DPSGD_class))
 
 
         # save theta of each client
@@ -250,7 +262,16 @@ class aggregateDataState(AppState):
         # aggregate the weights
         weights_updated = self.aggregate_data(use_smpc=False,
                                               use_dp=self.load("dpClient"))
+
+        # TODO :remove
+        print("summed up models")
+        print(weights_updated)
+
         weights_updated = weights_updated / len(self._app.clients)
+
+        # TODO :remove
+        print("aggregated model")
+        print(weights_updated)
 
         # update communication_rounds
         cur_comm = self.load("cur_communication_round") + 1
@@ -261,12 +282,17 @@ class aggregateDataState(AppState):
             # finnished
             fp = open(os.path.join("mnt", "output", "trained_model.pyc".format(cur_comm)), "wb")
             np.save(fp, weights_updated)
+            fp.close()
 
             DPSGD_class = self.load("DPSGD_class")
             DPSGD_class.theta = weights_updated
+            print(DPSGD_class.theta)
             acc, confMat = DPSGD_class.evaluate(X = self.load("X_test"),
                                                 y = self.load("y_test"))
 
+            #TODO; remove
+            print("final model:")
+            print(DPSGD_class.theta)
 
             # write evaluation results in output #TODO remove this from master
             config = self.load("config")
@@ -278,6 +304,7 @@ class aggregateDataState(AppState):
             # overwrite config file output
             fp = open(os.path.join("mnt", "output", "config.yaml"), "w")
             yaml.dump(config, fp)
+            fp.close()
 
             return "terminal"
         else:

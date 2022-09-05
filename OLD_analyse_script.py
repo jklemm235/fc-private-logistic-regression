@@ -33,12 +33,19 @@ if __name__ == "__main__":
         outputDir = os.path.join(os.getcwd(), args.outputDir[0])
     outList = list()
 
+    analysisCSVPath = os.path.join(outputDir, "analysis.csv")
+    offset_testnum = 0
+    if os.path.exists(analysisCSVPath):
+        dfAnalysis = pd.read_csv(analysisCSVPath)
+        offset_testnum = dfAnalysis["testnum"].max()
+
+
     # get models into the output folder and read in config files
     for zipout in os.listdir(inputDir):
         m = re.match("^results_test_(\d+)_client_(\d+)_.*\.zip$", zipout)
         if m:
             zipout = os.path.join(inputDir, zipout)
-            testnum = m.group(1)
+            testnum = int(m.group(1)) + offset_testnum
             curModelOutDir = os.path.join(outputDir,
                                           f"models_testnum_{testnum}")
             if not os.path.isdir(curModelOutDir):
