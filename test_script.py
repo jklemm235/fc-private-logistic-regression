@@ -12,7 +12,7 @@ import math
 import re
 import zipfile
 import pandas as pd
-
+from FeatureCloud.api.imp.test import commands as fc
 
 ##### Starting point of any test done #####
 # NOTE: DO NOT USE sgdOptions.L = 1 if you want to consider ALL data,
@@ -23,12 +23,12 @@ import pandas as pd
 # delta is set in main as 1 / (databasesize*10)
 config_base = {"sgdOptions":
                 {"alpha":  0.001,
-                 "max_iter": 500,
-                 "lambda_": 10e-4,
+                 "max_iter": 100,
+                 "lambda_": 0.01,
                  "tolerance": 10e-6,
                  "L": 0.2},
                 "labelColumn": None,
-                "communication_rounds": 1,
+                "communication_rounds": 5,
                 "dpMode": [],
                 "dpOptions":
                   {"epsilon":  0.1,
@@ -48,9 +48,7 @@ def TESTING(dfTotal, locationfolder, port):
   TESTING, change accordingly if other tests are wanted
   """
   curFold = 0
-  testnumsList = list() # needed in analysis, fill with results of run_test
   for dfTest, dfPrivacytest, dfTrain, foldInfoDict in fold_generator(dfTotal):
-    #TODO: remove testnumlist
     curFold += 1
     config_base.update(foldInfoDict)
 
@@ -63,10 +61,16 @@ def TESTING(dfTotal, locationfolder, port):
     print("numClients checked = {}".format(testNumClients))
     config_running = config_base.copy()
     for numClients in testNumClients:
-        testnumsList = testnumsList + run_test(config_running, dfTrain, dfTest,
+        run_test(config_running, dfTrain, dfTest,
                               locationfolder, port, numClients = numClients,
                               dataDistribution = None, resetClientDirs = True)
+
     continue # first batch of tests
+
+
+
+
+
 
     print("______________________________________________________")
     # TEST number aggregation rounds (communication_rounds)
@@ -76,7 +80,7 @@ def TESTING(dfTotal, locationfolder, port):
     for com_rounds in testComRounds:
       config_running = config_base.copy()
       config_running["communication_rounds"] = com_rounds
-      testnumsList = testnumsList + run_test(config_running, dfTrain, dfTest,
+      run_test(config_running, dfTrain, dfTest,
                     locationfolder, port, numClients = numClientsDefault,
                     dataDistribution = None)
     print("______________________________________________________")
@@ -90,7 +94,7 @@ def TESTING(dfTotal, locationfolder, port):
     for samplingRatio in testSamplingRatio:
       config_running = config_base.copy()
       config_running["sgdOptions"]["L"] = samplingRatio
-      testnumsList = testnumsList + run_test(config_running, dfTrain, dfTest,
+      run_test(config_running, dfTrain, dfTest,
               locationfolder, port, numClients = numClientsDefault,
               dataDistribution = None)
     print("______________________________________________________")
@@ -106,12 +110,12 @@ def TESTING(dfTotal, locationfolder, port):
       for epsilon in testEpsilon:
         config_running = config_base.copy()
         config_running["dpOptions"]["epsilon"] = epsilon
-        testnumsList = testnumsList + run_test(config_running, dfTrain, dfTest,
+        run_test(config_running, dfTrain, dfTest,
                 locationfolder, port, numClients = numClientsDefault,
                 dataDistribution = None)
       print("______________________________________________________")
 
-  return testnumsList
+  return None
 
 
 #####                                                                     #####
@@ -136,7 +140,7 @@ def fold_generator(df):
 ##### Helper, actually runs the tests #####
 def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
              dataDistribution = None, resetClientDirs = False,
-             num_redos = 5):
+             num_redos = 10):
   print("Running a test")
   #Save and print noise used for dp client
   if "DPCLIENT" in [x.upper() for x in configDict["dpMode"]]:
@@ -217,30 +221,27 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
 
 
   # Start test
-  testnumsList = list()
   for _ in range(num_redos):
-    startoutput = os.popen("featurecloud test start " +\
-        "--controller-host=http://localhost:{} ".format(port) +\
-        "--client-dirs={} ".format(','.join(["./client" + str(x) for x in \
-          range(numClients)])) +\
-        "--generic-dir=./ --app-image=fc-private-logistic-regression " +\
-        "--channel=local --query-interval=2 --download-results=./output")
-    startoutput = startoutput.read()
-    m = re.match("^Test id=(\d+) started$", startoutput)
-    if not m:
-      raise Exception("A test could not be started, ERROR: {}".format(
-                    startoutput))
-    testnumsList.append(int(m.group(1)))
+    startID = fc.start(controller_host = "http://localhost:{}".format(port),
+                       client_dirs = ','.join(["./client" + str(x) for x in \
+                          range(numClients)]),
+                       generic_dir = "./",
+                       app_image = "fc-private-logistic-regression",
+                       channel = 'local',
+                       query_interval = 2,
+                       download_results = "./output")
+
     # check if test is done
     time.sleep(5) # wait before checking if test is still running to let
     while True:
-      listoutput = os.popen("featurecloud test list " +\
-        "--controller-host=http://localhost:{} ".format(port)).read()
-      if not "running" in listoutput and not "init" in listoutput:
+      dfListTests = fc.list(controller_host = "http://localhost:{}".format(port))
+      status = dfListTests.loc[int(startID)]["status"].strip()
+      if status == "finished":
         break
+      elif status == "error":
+        print("ERROR: Test returned error, Id = {}".format(testID))
       time.sleep(5)
-  print(testnumsList)
-  return testnumsList
+  return None
 
 
 
@@ -321,28 +322,24 @@ if __name__ == "__main__":
     os.mkdir(outputDir)
 
   if not args.analyse:
-    testnumsList = TESTING(dfTotal, locationfolder, port)
-    # check if any errors and report
-    listoutput = os.popen("featurecloud test list " +\
-        "--controller-host=http://localhost:{} ".format(port)).read()
-    if "error" in listoutput:
-      print("WARNING: The controller session seems to contain at least one " +\
-            "ERROR, check the logs and run featurecloud test list to see more")
-
+    TESTING(dfTotal, locationfolder, port)
     time.sleep(30) # wait for results to be saved
 
+  outList = list()
+  analysisCSVPath = os.path.join(outputDir, "analysis.csv")
+  zipResultFolder = os.path.join(locationfolder, "tests", "output")
   # get models into the output folder and read in config files
-  for zipout in os.listdir(locationfolder):
-    m = re.match("^results_test_(\d+)_client_(\d+)_[a-zA-Z]+_(\d+)\.zip$", zipout)
+  for zipout in os.listdir(zipResultFolder):
+    m = re.match("^results_test_(\d+)_client_(\d+)_fc_[a-zA-Z]+_(\d+)\.zip$", zipout)
     if m:
-      zipout = os.path.join(locationfolder, zipout)
+      zipout = os.path.join(zipResultFolder, zipout)
       testnum = m.group(1)
       clientnum = m.group(2)
       testID = m.group(3)
       testIdent = str(testnum) + "_" + str(testID)
-      #TODO implement getting of only test specific data via
-      # os.path.getmtime(path)
-      # and if not current, continue
+      #ignore older results
+      if not args.analyse and os.path.getmtime(zipout) <= starttime:
+        continue
       curModelOutDir = os.path.join(outputDir, "test_{}".format(testIdent))
       if not os.path.isdir(curModelOutDir):
         os.mkdir(curModelOutDir)
@@ -380,11 +377,11 @@ if __name__ == "__main__":
   err_ind = list()
   headers = outList[0].keys()
 
-  if dfAnalysis:
-    print(dfAnalysis.columns)
-    if dfAnalysis.columns != headers:
-      raise Exception("analysis.csv file contains other header then newly " +\
-        "created tests")
+  if os.path.exists(analysisCSVPath):
+    with open(analysisCSVPath, "r") as csvOut:
+      if csvOut.readline().strip().split(",") != list(headers):
+        raise Exception("analysis.csv file contains other header then newly " +\
+          "created tests")
 
   for idx, nextHeader in enumerate(outList[1:]):
     if "status" not in nextHeader or nextHeader["status"] != "finished":

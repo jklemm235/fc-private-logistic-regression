@@ -13,7 +13,7 @@ test_data = dfTotal[0:30]
 
 config = {"sgdOptions":
                 {"alpha":  0.1,
-                 "max_iter": 100,
+                 "max_iter": 500,
                  "lambda_": 10e-6,
                  "tolerance": 10e-6,
                  "L": 50},
@@ -34,8 +34,8 @@ y_train = np.array(train_data[labelCol])
 X_test = np.array(test_data.drop(columns=[labelCol]))
 y_test = np.array(test_data[labelCol])
 
-
-
+#MAXIT
+'''
 results = dict()
 for x in range(100):
   for maxIt in [10, 30, 60, 70, 80, 90, 100, 120, 140, 200, 250, 300, 350, 400, 500, 600, 700]:
@@ -63,12 +63,12 @@ for key, valuelist in results.items():
 print("SEARCH BEST MAXITERATIONS:")
 print(results_processed)
 print(max(results_processed, key=results_processed.get))
+'''
 
 
 
-
-
-
+#L
+'''
 results = dict()
 for x in range(100):
   for curL in [1, 3, 8, 10, 12, 14, 15, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90]:
@@ -96,3 +96,35 @@ for key, valuelist in results.items():
 print("SEARCH BEST L:")
 print(results_processed)
 print(max(results_processed, key=results_processed.get))
+'''
+
+#LAMBDA_
+results = dict()
+for x in range(100):
+  for lambda_ in [10e-6, 10e-5, 10e-4, 10e-3, 10e-2, 10e-1, 1]:
+    #print(f"L = {curL}")
+    DPSGD_class = algo.LogisticRegression_DPSGD()
+    DPSGD_class.DP = False
+    DPSGD_class.alpha = config["sgdOptions"]["alpha"]
+    DPSGD_class.max_iter = config["sgdOptions"]["max_iter"]
+    DPSGD_class.lambda_ = lambda_ #config["sgdOptions"]["lambda_"]
+    DPSGD_class.tolerance = config["sgdOptions"]["tolerance"]
+    DPSGD_class.L = config["sgdOptions"]["L"]
+    DPSGD_class.C = config["dpOptions"]["C"]
+    DPSGD_class.epsilon = config["dpOptions"]["epsilon"]
+    DPSGD_class.delta = config["dpOptions"]["delta"]
+    X_cur, y_train_cur = DPSGD_class.init_theta(X, y_train)
+    DPSGD_class.train(X_cur, y_train_cur)
+    acc, confMat = DPSGD_class.evaluate(X = X_test, y = y_test)
+    if lambda_ in results:
+      results[lambda_].append(acc)
+    else:
+      results[lambda_] = [acc]
+results_processed = dict()
+for key, valuelist in results.items():
+  results_processed[key] = sum(valuelist) / len(valuelist)
+print("SEARCH BEST LAMBDA:")
+print(results_processed)
+print(max(results_processed, key=results_processed.get))
+# {1e-05: 0.9880000000000004, 0.0001: 0.9900000000000001, 0.001: 0.9883333333333334, 0.01: 0.9780000000000001, 0.1: 0.7356666666666672, 1.0: 0.6228333333333346}
+# 0.0001

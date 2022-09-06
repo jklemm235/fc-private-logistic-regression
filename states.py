@@ -108,6 +108,27 @@ class InitialState(AppState):
                 self.log("When delta is >= 0, gauss noise is used. " +\
                     "For gauss noise, epsilon must be between 0 and 1",
                     level = LogLevel.FATAL)
+            # change epsilon and delta according to the communication_rounds
+            # using the simple composition theorem
+            if DPSGD_class.DP:
+                DPSGD_class.epsilon = DPSGD_class.epsilon / \
+                                config["communication_rounds"]
+                DPSGD_class.delta = DPSGD_class.delta / \
+                                config["communication_rounds"]
+            elif dpClient:
+                if DPSGD_class.delta != 0:
+                    noisetype = DPNoisetype.GAUSS
+                else:
+                    noisetype = DPNoisetype.LAPLACE
+                epsilon = DPSGD_class.epsilon / config["communication_rounds"]
+                delta = DPSGD_class.delta / config["communication_rounds"]
+                self.configure_dp(epsilon = epsilon,
+                                delta =  delta,
+                                sensitivity = \
+                                    DPSGD_class.lambda_ * 2.0,
+                                clippingVal = None,
+                                noisetype = noisetype)
+        self.store(key = "dpClient", value = dpClient)
 
         ### Load in Data
         # check if data files exist
@@ -142,6 +163,8 @@ class InitialState(AppState):
         self.store(key = "n", value = n)
         self.store(key = "d", value = d)
 
+        # make sure L is given as absolute value and not as percentage
+        # sampleRatio saves the percentage
         if not DPSGD_class.L:
             # use all data if L = nil was given
             DPSGD_class.L = n
@@ -150,31 +173,11 @@ class InitialState(AppState):
             # change L to the correct value if L is a percentage
             sampleRatio = DPSGD_class.L
             DPSGD_class.L = int(DPSGD_class.L * n)
-
         # else keep L as it is
 
         # modify data depending on which prediction function is used
         # (binary vs multiple classes)
         X, y_train = DPSGD_class.init_theta(X, y_train)
-
-        ### configure DP for dpClient
-        if dpClient:
-            if DPSGD_class.delta != 0:
-                noisetype = DPNoisetype.GAUSS
-            else:
-                noisetype = DPNoisetype.LAPLACE
-            epsilon = DPSGD_class.epsilon / config["communication_rounds"]
-            delta = DPSGD_class.delta / config["communication_rounds"]
-            self.configure_dp(epsilon = epsilon,
-                            delta =  delta,
-                            sensitivity = \
-                                DPSGD_class.lambda_ * 2.0,
-                            clippingVal = None,
-                            noisetype = noisetype)
-
-        self.store(key = "dpClient", value = dpClient)
-
-
 
         self.store(key = "X", value = X)
         self.store(key = "y_train", value = y_train)
