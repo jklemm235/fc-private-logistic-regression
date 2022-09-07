@@ -51,13 +51,14 @@ def TESTING(dfTotal, locationfolder, port):
   for dfTest, dfPrivacytest, dfTrain, foldInfoDict in fold_generator(dfTotal):
     curFold += 1
     config_base.update(foldInfoDict)
-
+    if curFold < 4:
+        continue #TODO: rmv 
     print(f"Starting Fold {curFold}")
     # TEST number clients
     print("Running test number clients:")
     # Warning, for iris, don't use more than 12 clients, the dataset is too
     # small
-    testNumClients = [1, 2, 4, 6, 8, 10]
+    testNumClients = [6,8,10]#[1, 2, 4, 6, 8, 10] TODO: put in again
     print("numClients checked = {}".format(testNumClients))
     config_running = config_base.copy()
     for numClients in testNumClients:
@@ -239,7 +240,8 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
       if status == "finished":
         break
       elif status == "error":
-        print("ERROR: Test returned error, Id = {}".format(testID))
+        print("ERROR: Test returned error, Id = {}".format(startID))
+        break
       time.sleep(5)
   return None
 
