@@ -23,7 +23,7 @@ from FeatureCloud.api.imp.test import commands as fc
 # delta is set in main as 1 / (databasesize*10)
 config_base = {"sgdOptions":
                 {"alpha":  0.001,
-                 "max_iter": 100,
+                 "max_iter": 500,
                  "lambda_": 0.01,
                  "tolerance": 10e-6,
                  "L": 0.2},
@@ -51,14 +51,15 @@ def TESTING(dfTotal, locationfolder, port):
   for dfTest, dfPrivacytest, dfTrain, foldInfoDict in fold_generator(dfTotal):
     curFold += 1
     config_base.update(foldInfoDict)
-    if curFold < 4:
-        continue #TODO: rmv 
+    #TODO: rmv
+    if curFold < 2:
+        continue
     print(f"Starting Fold {curFold}")
     # TEST number clients
     print("Running test number clients:")
     # Warning, for iris, don't use more than 12 clients, the dataset is too
     # small
-    testNumClients = [6,8,10]#[1, 2, 4, 6, 8, 10] TODO: put in again
+    testNumClients = [1,2,3,4,5] #[1, 2, 4, 6, 8, 10] TODO: put in again
     print("numClients checked = {}".format(testNumClients))
     config_running = config_base.copy()
     for numClients in testNumClients:
@@ -239,7 +240,7 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
       status = dfListTests.loc[int(startID)]["status"].strip()
       if status == "finished":
         break
-      elif status == "error":
+      elif status == "error" or status == "stopped":
         print("ERROR: Test returned error, Id = {}".format(startID))
         break
       time.sleep(5)
