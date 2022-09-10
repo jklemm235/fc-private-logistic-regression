@@ -36,7 +36,7 @@ config_base = {"sgdOptions":
                    "C": 1}
                 }
 
-numClientsDefault = 2 # default number of clients
+numClientsDefault = 3 # default number of clients
 numFoldsCrossValidation = 5 # default number of folds for numFoldsCrossValidation
                             # 1 fold will be used for testing, one for privacy
                             # attacks and the rest for training, so at least
@@ -50,12 +50,14 @@ def TESTING(dfTotal, locationfolder, port):
   curFold = 0
   for dfTest, dfPrivacytest, dfTrain, foldInfoDict in fold_generator(dfTotal):
     curFold += 1
-    config_base.update(foldInfoDict)
     #TODO: rmv
     if curFold < 2:
         continue
+    config_base.update(foldInfoDict)
     print(f"Starting Fold {curFold}")
+    
     # TEST number clients
+    '''
     print("Running test number clients:")
     # Warning, for iris, don't use more than 12 clients, the dataset is too
     # small
@@ -66,18 +68,12 @@ def TESTING(dfTotal, locationfolder, port):
         run_test(config_running, dfTrain, dfTest,
                               locationfolder, port, numClients = numClients,
                               dataDistribution = None, resetClientDirs = True)
-
-    continue # first batch of tests
-
-
-
-
-
-
     print("______________________________________________________")
+    '''
     # TEST number aggregation rounds (communication_rounds)
+    #'''
     print("Running test number communication_rounds:")
-    testComRounds = [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    testComRounds = [1, 2, 4, 8, 16, 32, 64] # Mostly relevant with Dp
     print("com_rounds checked = {}".format(testComRounds))
     for com_rounds in testComRounds:
       config_running = config_base.copy()
@@ -86,8 +82,8 @@ def TESTING(dfTotal, locationfolder, port):
                     locationfolder, port, numClients = numClientsDefault,
                     dataDistribution = None)
     print("______________________________________________________")
-
-
+    #'''
+    continue #TODO: rmv again
     # TEST sample size (L)
     print("Running test samplingRatio:")
     testSamplingRatio = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5,
@@ -141,7 +137,7 @@ def fold_generator(df):
 
 ##### Helper, actually runs the tests #####
 def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
-             dataDistribution = None, resetClientDirs = False,
+             dataDistribution = None, resetClientDirs = True,
              num_redos = 10):
   print("Running a test")
   #Save and print noise used for dp client
@@ -167,8 +163,7 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
       if os.path.basename(folder)[0:6] == "client":
         clientCount += 1
         # overwrite config file
-        with open(os.path.join(locationfolder, folder,
-                               "config.yaml"), 'w') as fp:
+        with open(os.path.join(folder, "config.yaml"), 'w') as fp:
           yaml.dump(configDict, fp)
     if clientCount != numClients:
       # incorrect client structure currently in data folder, reset it
