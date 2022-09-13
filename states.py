@@ -49,6 +49,7 @@ class InitialState(AppState):
                                    configFileName), 'r') as stream:
                 config = yaml.safe_load(stream)
         except Exception as err:
+            print("Config file could not be loaded!")
             self.log(f"Error loading config.yaml: f{err}",
                      level = LogLevel.FATAL)
 
@@ -66,6 +67,7 @@ class InitialState(AppState):
         DPSGD_class = algo.LogisticRegression_DPSGD()
         # DP information
         if "dpMode" not in config:
+            print("no DP MOde given")
             self.log("Error, config files contains no DP information, " +\
                      "if no DP is wanted, please set dpMode to none",
                     level = LogLevel.FATAL)
@@ -92,7 +94,8 @@ class InitialState(AppState):
             DPSGD_class.delta = config["dpOptions"]["delta"]
             labelCol = config["labelColumn"]
         except Exception as err:
-            self.log(f"Config file seems to miss fields: {err}",
+            print("config seems to miss lines: {}".format(str(err)))
+            self.log(f"Config file seems to miss fields: {str(err)}",
                      level = LogLevel.FATAL)
 
         # More dp related configuration
