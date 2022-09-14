@@ -25,7 +25,7 @@ config_base = {"sgdOptions":
                 {"alpha":  0.1,
                  "max_iter": 500,
                  "lambda_": 0.01,
-                 "tolerance": 10e-6,
+                 "tolerance": 1e-5,
                  "L": 1.0},
                 "labelColumn": None,
                 "communication_rounds": 5,
