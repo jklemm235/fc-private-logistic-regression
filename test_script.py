@@ -22,11 +22,11 @@ from FeatureCloud.api.imp.test import commands as fc
 # labelColumn is set via commandline
 # delta is set in main as 1 / (databasesize*10)
 config_base = {"sgdOptions":
-                {"alpha":  0.001,
+                {"alpha":  0.1,
                  "max_iter": 500,
                  "lambda_": 0.01,
                  "tolerance": 10e-6,
-                 "L": 0.2},
+                 "L": 1.0},
                 "labelColumn": None,
                 "communication_rounds": 5,
                 "dpMode": [],
@@ -43,47 +43,50 @@ numFoldsCrossValidation = 5 # default number of folds for numFoldsCrossValidatio
                             # 3 folds are necessary
 
 
-def TESTING(dfTotal, locationfolder, port):
+def TESTING(dfTotal, locationfolder, port, controllerfolder):
   """
   TESTING, change accordingly if other tests are wanted
   """
   curFold = 0
   for dfTest, dfPrivacytest, dfTrain, foldInfoDict in fold_generator(dfTotal):
     curFold += 1
-    #TODO: rmv
-    if curFold < 2:
-        continue
     config_base.update(foldInfoDict)
     print(f"Starting Fold {curFold}")
     
     # TEST number clients
-    '''
     print("Running test number clients:")
     # Warning, for iris, don't use more than 12 clients, the dataset is too
     # small
-    testNumClients = [1,2,3,4,5] #[1, 2, 4, 6, 8, 10] TODO: put in again
+    testNumClients = [1,2,3,4,5,6,7]
+    testComRounds = [1, 2, 4, 8, 10, 12, 14]
     print("numClients checked = {}".format(testNumClients))
     config_running = config_base.copy()
     for numClients in testNumClients:
+      for com_rounds in testNumClients:
+        config_running["communication_rounds"] = com_rounds
         run_test(config_running, dfTrain, dfTest,
-                              locationfolder, port, numClients = numClients,
+                              locationfolder, port, controllerfolder,
+                              numClients = numClients,
                               dataDistribution = None, resetClientDirs = True)
     print("______________________________________________________")
-    '''
+    continue #TODO; rmv
+
+
     # TEST number aggregation rounds (communication_rounds)
     #'''
     print("Running test number communication_rounds:")
-    testComRounds = [1, 2, 4, 8, 16, 32, 64] # Mostly relevant with Dp
+    testComRounds = [1, 2, 4, 8, 10, 12, 14, 16, 18] # Mostly relevant with Dp
     print("com_rounds checked = {}".format(testComRounds))
     for com_rounds in testComRounds:
       config_running = config_base.copy()
       config_running["communication_rounds"] = com_rounds
       run_test(config_running, dfTrain, dfTest,
-                    locationfolder, port, numClients = numClientsDefault,
+                    locationfolder, port, controllerfolder,
+                    numClients = numClientsDefault,
                     dataDistribution = None)
     print("______________________________________________________")
     #'''
-    continue #TODO: rmv again
+
     # TEST sample size (L)
     print("Running test samplingRatio:")
     testSamplingRatio = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5,
@@ -93,7 +96,8 @@ def TESTING(dfTotal, locationfolder, port):
       config_running = config_base.copy()
       config_running["sgdOptions"]["L"] = samplingRatio
       run_test(config_running, dfTrain, dfTest,
-              locationfolder, port, numClients = numClientsDefault,
+              locationfolder, port, controllerfolder,
+              numClients = numClientsDefault,
               dataDistribution = None)
     print("______________________________________________________")
 
@@ -103,13 +107,15 @@ def TESTING(dfTotal, locationfolder, port):
       # Just run tests with any dp mode activated, as without it, it doesnt
       # make any difference to change epsilon
       print("Running test epsilon")
-      testEpsilon = [0.001, 0.01, 0.1, 0.2, 0.4, 0.8]
+      testEpsilon = [0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.8, 0.9, 1.0, 2.0,
+                     3.0, 4.0, 6.0, 8.0, 12.0]
       print("epsilon checked = {}".format(testEpsilon))
       for epsilon in testEpsilon:
         config_running = config_base.copy()
         config_running["dpOptions"]["epsilon"] = epsilon
         run_test(config_running, dfTrain, dfTest,
-                locationfolder, port, numClients = numClientsDefault,
+                locationfolder, port, controllerfolder,
+                numClients = numClientsDefault,
                 dataDistribution = None)
       print("______________________________________________________")
 
@@ -136,9 +142,10 @@ def fold_generator(df):
 
 
 ##### Helper, actually runs the tests #####
-def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
+def run_test(configDict, dfTrain, dfTest, locationfolder, port,
+             controllerfolder, numClients,
              dataDistribution = None, resetClientDirs = True,
-             num_redos = 10):
+             num_redos = 5):
   print("Running a test")
   #Save and print noise used for dp client
   if "DPCLIENT" in [x.upper() for x in configDict["dpMode"]]:
@@ -219,7 +226,8 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
 
   # Start test
   for _ in range(num_redos):
-    startID = fc.start(controller_host = "http://localhost:{}".format(port),
+    try:
+      startID = fc.start(controller_host = "http://localhost:{}".format(port),
                        client_dirs = ','.join(["./client" + str(x) for x in \
                           range(numClients)]),
                        generic_dir = "./",
@@ -227,11 +235,33 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port, numClients,
                        channel = 'local',
                        query_interval = 2,
                        download_results = "./output")
+    except Exception as err:
+      print("ERROR occured: {}".format(str(err)))
+      print("restarting controller")
+      # restart controller
+      _ = os.popen(os.path.join(controllerfolder, "stop_controller.sh"))
+      time.sleep(3)
+      _ = os.popen(os.path.join(controllerfolder, "start_controller_dev.sh"))
+      # wait
+      time.sleep(10)
+      continue
 
     # check if test is done
-    time.sleep(5) # wait before checking if test is still running to let
+    time.sleep(10) # wait before checking if test is still running to let
     while True:
-      dfListTests = fc.list(controller_host = "http://localhost:{}".format(port))
+      try:
+        dfListTests = fc.list(controller_host = "http://localhost:{}".format(port))
+      except Exception as err:
+        print("ERROR occured: {}".format(str(err)))
+        print("restarting controller")
+        # restart controller
+        _ = os.popen(os.path.join(controllerfolder, "stop_controller.sh"))
+        time.sleep(3)
+        _ = os.popen(os.path.join(controllerfolder, "start_controller_dev.sh"))
+        # wait
+        time.sleep(10)
+        break
+
       status = dfListTests.loc[int(startID)]["status"].strip()
       if status == "finished":
         break
@@ -275,6 +305,11 @@ if __name__ == "__main__":
   parser.add_argument('--analyse-all', help = 'skips testing and analyses ' +\
                       'everything found in the controllerdata/tests/output',
                      action = "store_true", default = False, dest = "analyse")
+  parser.add_argument("-c", "--controller-dir", help = "Directory of the " +\
+                      "controller used, needed for restarting of the controller" +\
+                      "in case of an error", required = True, nargs = 1,
+                      dest = "controller")
+
   args = parser.parse_args()
 
   ##### change config_base ####
@@ -300,6 +335,7 @@ if __name__ == "__main__":
   # read out args
 
   locationfolder = args.location[0]
+  controllerfolder = args.controller[0]
   if os.path.basename(locationfolder) != "data":
     print("ERROR: locationfolder must end with data")
     exit()
@@ -320,7 +356,7 @@ if __name__ == "__main__":
     os.mkdir(outputDir)
 
   if not args.analyse:
-    TESTING(dfTotal, locationfolder, port)
+    TESTING(dfTotal, locationfolder, port, controllerfolder)
     time.sleep(30) # wait for results to be saved
 
   outList = list()

@@ -172,11 +172,13 @@ class InitialState(AppState):
             # use all data if L = nil was given
             DPSGD_class.L = n
             sampleRatio = 1
-        elif DPSGD_class.L < 1:
+        elif DPSGD_class.L <= 1:
             # change L to the correct value if L is a percentage
             sampleRatio = DPSGD_class.L
             DPSGD_class.L = int(DPSGD_class.L * n)
-        # else keep L as it is
+        else:
+            self.log("L must be given as a float of (0, 1]",
+                     level = LogLevel.FATAL)
 
         # modify data depending on which prediction function is used
         # (binary vs multiple classes)
