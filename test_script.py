@@ -241,11 +241,14 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
       # restart controller
       _ = os.popen(os.path.join(controllerfolder, "stop_controller.sh"))
       time.sleep(3)
-      _ = os.popen(os.path.join(controllerfolder, "start_controller_dev.sh"))
+      if int(port) == 8002:
+        _ = os.popen(os.path.join(controllerfolder, "start_controller_dev.sh"))
+      else:
+        _ = os.popen(os.path.join(controllerfolder, "start_controller.sh"))
       # wait
       time.sleep(10)
       continue
-
+  
     # check if test is done
     time.sleep(10) # wait before checking if test is still running to let
     while True:
@@ -255,9 +258,11 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
         print("ERROR occured: {}".format(str(err)))
         print("restarting controller")
         # restart controller
-        _ = os.popen(os.path.join(controllerfolder, "stop_controller.sh"))
+        if int(port) == 8002:
+          _ = os.popen(os.path.join(controllerfolder, "stop_controller_dev.sh"))
+        else:
+          _ = os.popen(os.path.join(controllerfolder, "start_controller.sh"))
         time.sleep(3)
-        _ = os.popen(os.path.join(controllerfolder, "start_controller_dev.sh"))
         # wait
         time.sleep(10)
         break
