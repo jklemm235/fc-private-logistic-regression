@@ -373,21 +373,16 @@ if __name__ == "__main__":
   headers = outList[0].keys()
 
   if os.path.exists(analysisCSVPath):
-    with open(analysisCSVPath, "r") as csvOut:
-      if csvOut.readline().strip().split(",") != list(headers):
-        raise Exception("analysis.csv file contains other header then newly " +\
-          "created tests")
+    raise Exception("analysis.csv already exists")
 
   for idx, nextHeader in enumerate(outList[1:]):
     if "status" not in nextHeader or nextHeader["status"] != "finished":
       err_ind.append(idx + 1)
       continue
-    if headers != nextHeader.keys():
-      print("ERROR: in test: {}".format(nextHeader))
-      raise Exception(
-            "ERROR, config output files were different over " +\
-            "different test runs, redo tests or a csv output cannot be " +\
-            "generated")
+    for key in nextHeader.keys():
+      if key not in headers:
+        headers.append(key)
+
 
   if len(err_ind) > 0:
     print("The following test runs did not run correctly:")
@@ -395,13 +390,14 @@ if __name__ == "__main__":
         print(outList[idx])
 
   # write header if necessary
-  if not os.path.exists(analysisCSVPath):
-    with open(analysisCSVPath, "w") as csvOut:
+  with open(analysisCSVPath, "w") as csvOut:
       csvOut.write(','.join(headers) + '\n')
 
   # write lines
   with open(analysisCSVPath, "a") as csvOut:
     for idx, outDict in enumerate(outList):
       if idx not in err_ind:
-        csvOut.write(','.join([str(x) for x in outDict.values()]) + '\n')
+        for key in headers[:-1]:
+          csvOut.write(str(outDict[key]) + ",")
+        csvOut.write(str(outDict[headers[-1]]) + "\n") #write last key
 
