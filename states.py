@@ -180,7 +180,7 @@ class InitialState(AppState):
                     config["noiseScale"] = \
                         (2.0 * math.log(1.25/delta) * math.pow(sensitivity, 2)) / math.pow(epsilon, 2)
                 else:
-                    config["noiseScale"] = sensitivity \ epsilon
+                    config["noiseScale"] = sensitivity / epsilon
                 self.configure_dp(epsilon = epsilon,
                                 delta =  delta,
                                 sensitivity = sensitivity,

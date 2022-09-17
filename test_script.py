@@ -104,21 +104,6 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
              dataDistribution = None, resetClientDirs = True,
              num_redos = 5):
   print("Running a test")
-  #Save and print noise used for dp client
-  if "DPCLIENT" in [x.upper() for x in configDict["dpMode"]]:
-    print("noise scale will be for dpClient:")
-    eps = configDict["dpOptions"]["epsilon"] / configDict["communication_rounds"]
-    delt = configDict["dpOptions"]["delta"] / configDict["communication_rounds"]
-    lam = configDict["sgdOptions"]["lambda_"]
-    if delt != 0:
-      configDict["noiseScale"] = \
-        (2 * math.log(1.25 / delt) * math.pow(lam * 2, 2)) / math.pow(eps, 2)
-    else:
-      configDict["noiseScale"] = (lam * 2) / eps
-    configDict["noiseScale"] = configDict["noiseScale"] * \
-                              configDict["sgdOptions"]["L"]
-  else:
-    configDict["noiseScale"] = None
 
   if not resetClientDirs:
     # check if dirs are there
@@ -191,7 +176,7 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
                        generic_dir = "./",
                        app_image = "fc-private-logistic-regression",
                        channel = 'local',
-                       query_interval = 2,
+                       query_interval = 7,
                        download_results = "./output")
     except Exception as err:
       print("ERROR occured: {}".format(str(err)))
@@ -333,6 +318,8 @@ if __name__ == "__main__":
     TESTING(dfTotal, locationfolder, port, controllerfolder)
     time.sleep(30) # wait for results to be saved
 
+  #TODO: fix analysis part and reactivte it
+  exit()
   outList = list()
   analysisCSVPath = os.path.join(outputDir, "analysis.csv")
   zipResultFolder = os.path.join(locationfolder, "tests", "output")
