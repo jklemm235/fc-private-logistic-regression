@@ -57,41 +57,24 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
     print("Running test number clients:")
     # Warning, for iris, don't use more than 12 clients, the dataset is too
     # small
-    testNumClients = [1,2,3,4,5,6,7]
-    testComRounds = [1, 2, 4, 8, 10, 12, 14]
-    testEpsilon = [0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.8, 0.9, 1.0, 2.0,
-            3.0, 4.0, 6.0, 8.0, 12.0]
+    testNumClients = [1,3,5,7]
+    testComRounds = [1, 5, 10, 15]
+    testEpsilon = [0.01, 0.1, 0.4, 0.8, 3.0]
     config_running = config_base.copy()
+    config_running["dpOptions"]["delta"] = 0 # to use laplace noise
     for numClients in testNumClients:
       print("Num Clients: {}".format(numClients))
       for com_rounds in testComRounds:
         print("Com_rounds: {}".format(com_rounds))
         config_running["communication_rounds"] = com_rounds
-        run_test(config_running, dfTrain, dfTest,
+        for epsilon in testEpsilon:
+          print("Epsilon: {}".format(epsilon))
+          config_running["dpOptions"]["epsilon"] = epsilon
+          run_test(config_running, dfTrain, dfTest,
                               locationfolder, port, controllerfolder,
                               numClients = numClients,
                               dataDistribution = None, resetClientDirs = True)
     print("______________________________________________________")
-    continue #TODO; rmv
-
-
-    
-    # TEST epsilon, using gauss noise
-    if not "NODP" in [x.upper() for x in config_base["dpMode"]]:
-      # Just run tests with any dp mode activated, as without it, it doesnt
-      # make any difference to change epsilon
-      print("Running test epsilon")
-      testEpsilon = [0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.8, 0.9, 1.0, 2.0,
-                     3.0, 4.0, 6.0, 8.0, 12.0]
-      print("epsilon checked = {}".format(testEpsilon))
-      for epsilon in testEpsilon:
-        config_running = config_base.copy()
-        config_running["dpOptions"]["epsilon"] = epsilon
-        run_test(config_running, dfTrain, dfTest,
-                locationfolder, port, controllerfolder,
-                numClients = numClientsDefault,
-                dataDistribution = None)
-      print("______________________________________________________")
 
   return None
 
@@ -200,6 +183,7 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
 
   # Start test
   for _ in range(num_redos):
+    testStartTime = time.time()
     try:
       startID = fc.start(controller_host = "http://localhost:{}".format(port),
                        client_dirs = ','.join(["./client" + str(x) for x in \
@@ -214,13 +198,13 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
       print("restarting controller")
       # restart controller
       _ = os.popen(os.path.join(controllerfolder, "stop_controller.sh"))
-      time.sleep(3)
-      if int(port) == 8002:
-        _ = os.popen("bash " + str(os.path.join(controllerfolder, "start_controller_dev.sh")))
-      else:
-        _ = os.popen("bash " + str(os.path.join(controllerfolder, "start_controller.sh")))
-      # wait
       time.sleep(10)
+      if int(port) == 8002:
+        _ = os.popen(str(os.path.join(controllerfolder, "start_controller_dev.sh")))
+      else:
+        _ = os.popen(str(os.path.join(controllerfolder, "start_controller.sh")))
+      # wait
+      time.sleep(15)
       continue
   
     # check if test is done
@@ -232,13 +216,14 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
         print("ERROR occured: {}".format(str(err)))
         print("restarting controller")
         # restart controller
-        if int(port) == 8002:
-          _ = os.popen("bash " + str(os.path.join(controllerfolder, "stop_controller_dev.sh")))
-        else:
-          _ = os.popen("bash " + str(os.path.join(controllerfolder, "start_controller.sh")))
-        time.sleep(3)
-        # wait
+        _ = os.popen(os.path.join(controllerfolder, "stop_controller.sh"))
         time.sleep(10)
+        if int(port) == 8002:
+          _ = os.popen(str(os.path.join(controllerfolder, "start_controller_dev.sh")))
+        else:
+          _ = os.popen(str(os.path.join(controllerfolder, "start_controller.sh")))
+        # wait
+        time.sleep(15)
         break
 
       status = dfListTests.loc[int(startID)]["status"].strip()
@@ -246,6 +231,10 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
         break
       elif status == "error" or status == "stopped":
         print("ERROR: Test returned error, Id = {}".format(startID))
+        break
+      elif time.time() - testStartTime > 900:
+        print("ERROR: Test is running for more than 15 mins, Id = {}".format(
+          startID))
         break
       time.sleep(5)
   return None
