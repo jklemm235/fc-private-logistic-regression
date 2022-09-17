@@ -98,40 +98,6 @@ class InitialState(AppState):
             self.log(f"Config file seems to miss fields: {str(err)}",
                      level = LogLevel.FATAL)
 
-        # More dp related configuration
-        if DPSGD_class.DP or dpClient:
-            # check if epsilon and delta are ok
-            if DPSGD_class.delta < 0 or DPSGD_class.delta >= 1:
-                self.log("delta must be [0,1)",
-                         level = LogLevel.FATAL)
-            elif DPSGD_class.epsilon <= 0:
-                self.log("epsilon must be > 0",
-                         level = LogLevel.FATAL)
-            elif DPSGD_class.delta != 0 and DPSGD_class.epsilon >= 1:
-                self.log("When delta is >= 0, gauss noise is used. " +\
-                    "For gauss noise, epsilon must be between 0 and 1",
-                    level = LogLevel.FATAL)
-            # change epsilon and delta according to the communication_rounds
-            # using the simple composition theorem
-            if DPSGD_class.DP:
-                DPSGD_class.epsilon = DPSGD_class.epsilon / \
-                                config["communication_rounds"]
-                DPSGD_class.delta = DPSGD_class.delta / \
-                                config["communication_rounds"]
-            elif dpClient:
-                if DPSGD_class.delta != 0:
-                    noisetype = DPNoisetype.GAUSS
-                else:
-                    noisetype = DPNoisetype.LAPLACE
-                epsilon = DPSGD_class.epsilon / config["communication_rounds"]
-                delta = DPSGD_class.delta / config["communication_rounds"]
-                self.configure_dp(epsilon = epsilon,
-                                delta =  delta,
-                                sensitivity = \
-                                    DPSGD_class.lambda_ * 2.0,
-                                clippingVal = None,
-                                noisetype = noisetype)
-        self.store(key = "dpClient", value = dpClient)
 
         ### Load in Data
         # check if data files exist
@@ -180,9 +146,55 @@ class InitialState(AppState):
             self.log("L must be given as a float of (0, 1]",
                      level = LogLevel.FATAL)
 
+        # More dp related configuration
+        if DPSGD_class.DP or dpClient:
+            # check if epsilon and delta are ok
+            if DPSGD_class.delta < 0 or DPSGD_class.delta >= 1:
+                self.log("delta must be [0,1)",
+                         level = LogLevel.FATAL)
+            elif DPSGD_class.epsilon <= 0:
+                self.log("epsilon must be > 0",
+                         level = LogLevel.FATAL)
+            elif DPSGD_class.delta != 0 and DPSGD_class.epsilon >= 1:
+                self.log("When delta is >= 0, gauss noise is used. " +\
+                    "For gauss noise, epsilon must be between 0 and 1",
+                    level = LogLevel.FATAL)
+            # change epsilon and delta according to the communication_rounds
+            # using the simple composition theorem
+            if DPSGD_class.DP:
+                DPSGD_class.epsilon = DPSGD_class.epsilon / \
+                                config["communication_rounds"]
+                DPSGD_class.delta = DPSGD_class.delta / \
+                                config["communication_rounds"]
+            elif dpClient:
+                if DPSGD_class.delta != 0:
+                    noisetype = DPNoisetype.GAUSS
+                else:
+                    noisetype = DPNoisetype.LAPLACE
+                epsilon = DPSGD_class.epsilon / config["communication_rounds"]
+                delta = DPSGD_class.delta / config["communication_rounds"]
+                sensitivity = 2.0 / (n * DPSGD_class.lambda_)
+                config["sensitivityType"] = "local"
+                config["sensitivity"] = sensitivity
+                if delta != 0:
+                    config["noiseScale"] = \
+                        (2.0 * math.log(1.25/delta) * math.pow(sensitivity, 2)) / math.pow(epsilon, 2)
+                else:
+                    config["noiseScale"] = sensitivity \ epsilon
+                self.configure_dp(epsilon = epsilon,
+                                delta =  delta,
+                                sensitivity = sensitivity,
+                                clippingVal = None,
+                                noisetype = noisetype)
+        self.store(key = "dpClient", value = dpClient)
+
+
         # modify data depending on which prediction function is used
         # (binary vs multiple classes)
         X, y_train = DPSGD_class.init_theta(X, y_train)
+
+
+
 
         self.store(key = "X", value = X)
         self.store(key = "y_train", value = y_train)
