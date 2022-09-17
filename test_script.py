@@ -235,6 +235,11 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
       elif time.time() - testStartTime > 900:
         print("ERROR: Test is running for more than 15 mins, Id = {}".format(
           startID))
+        try:
+          fc.stop(controller_host = "http://localhost:{}".format(port),
+                test_id = startID)
+        except:
+          print("test {} could not be stopped".format(startID))
         break
       time.sleep(5)
   return None
