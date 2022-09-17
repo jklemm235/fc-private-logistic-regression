@@ -59,10 +59,13 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
     # small
     testNumClients = [1,2,3,4,5,6,7]
     testComRounds = [1, 2, 4, 8, 10, 12, 14]
-    print("numClients checked = {}".format(testNumClients))
+    testEpsilon = [0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.8, 0.9, 1.0, 2.0,
+            3.0, 4.0, 6.0, 8.0, 12.0]
     config_running = config_base.copy()
     for numClients in testNumClients:
-      for com_rounds in testNumClients:
+      print("Num Clients: {}".format(numClients))
+      for com_rounds in testComRounds:
+        print("Com_rounds: {}".format(com_rounds))
         config_running["communication_rounds"] = com_rounds
         run_test(config_running, dfTrain, dfTest,
                               locationfolder, port, controllerfolder,
@@ -72,36 +75,7 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
     continue #TODO; rmv
 
 
-    # TEST number aggregation rounds (communication_rounds)
-    #'''
-    print("Running test number communication_rounds:")
-    testComRounds = [1, 2, 4, 8, 10, 12, 14, 16, 18] # Mostly relevant with Dp
-    print("com_rounds checked = {}".format(testComRounds))
-    for com_rounds in testComRounds:
-      config_running = config_base.copy()
-      config_running["communication_rounds"] = com_rounds
-      run_test(config_running, dfTrain, dfTest,
-                    locationfolder, port, controllerfolder,
-                    numClients = numClientsDefault,
-                    dataDistribution = None)
-    print("______________________________________________________")
-    #'''
-
-    # TEST sample size (L)
-    print("Running test samplingRatio:")
-    testSamplingRatio = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5,
-                         0.6, 0.7, 0.8, dfTrain.shape[0]]
-    print("samplingRatio checked = {}".format(testSamplingRatio))
-    for samplingRatio in testSamplingRatio:
-      config_running = config_base.copy()
-      config_running["sgdOptions"]["L"] = samplingRatio
-      run_test(config_running, dfTrain, dfTest,
-              locationfolder, port, controllerfolder,
-              numClients = numClientsDefault,
-              dataDistribution = None)
-    print("______________________________________________________")
-
-
+    
     # TEST epsilon, using gauss noise
     if not "NODP" in [x.upper() for x in config_base["dpMode"]]:
       # Just run tests with any dp mode activated, as without it, it doesnt
@@ -242,9 +216,9 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
       _ = os.popen(os.path.join(controllerfolder, "stop_controller.sh"))
       time.sleep(3)
       if int(port) == 8002:
-        _ = os.popen(os.path.join(controllerfolder, "start_controller_dev.sh"))
+        _ = os.popen("bash " + str(os.path.join(controllerfolder, "start_controller_dev.sh")))
       else:
-        _ = os.popen(os.path.join(controllerfolder, "start_controller.sh"))
+        _ = os.popen("bash " + str(os.path.join(controllerfolder, "start_controller.sh")))
       # wait
       time.sleep(10)
       continue
@@ -259,9 +233,9 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
         print("restarting controller")
         # restart controller
         if int(port) == 8002:
-          _ = os.popen(os.path.join(controllerfolder, "stop_controller_dev.sh"))
+          _ = os.popen("bash " + str(os.path.join(controllerfolder, "stop_controller_dev.sh")))
         else:
-          _ = os.popen(os.path.join(controllerfolder, "start_controller.sh"))
+          _ = os.popen("bash " + str(os.path.join(controllerfolder, "start_controller.sh")))
         time.sleep(3)
         # wait
         time.sleep(10)
@@ -361,6 +335,7 @@ if __name__ == "__main__":
     os.mkdir(outputDir)
 
   if not args.analyse:
+    print("Starting TESTING")
     TESTING(dfTotal, locationfolder, port, controllerfolder)
     time.sleep(30) # wait for results to be saved
 

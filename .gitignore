@@ -4,3 +4,4 @@ venv
 
 data/*
 !data/config.yaml
+output*
