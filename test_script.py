@@ -182,6 +182,8 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
     except Exception as err:
       print("ERROR occured: {}".format(str(err)))
       print("restarting controller")
+      curDir = os.getcwd()
+      os.chdir(controllerfolder)
       # restart controller
       _ = os.popen(os.path.join(controllerfolder, "stop_controller.sh"))
       time.sleep(10)
@@ -191,8 +193,9 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
         _ = os.popen(str(os.path.join(controllerfolder, "start_controller.sh")))
       # wait
       time.sleep(15)
+      os.chdir(curDir) 
       continue
-  
+
     # check if test is done
     time.sleep(10) # wait before checking if test is still running to let
     while True:
@@ -201,7 +204,9 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
       except Exception as err:
         print("ERROR occured: {}".format(str(err)))
         print("restarting controller")
-        # restart controller
+        curDir = os.getcwd()
+        os.chdir(controllerfolder)
+       # restart controller
         _ = os.popen(os.path.join(controllerfolder, "stop_controller.sh"))
         time.sleep(10)
         if int(port) == 8002:
@@ -210,6 +215,7 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
           _ = os.popen(str(os.path.join(controllerfolder, "start_controller.sh")))
         # wait
         time.sleep(15)
+        os.chdir(curDir)
         break
 
       status = dfListTests.loc[int(startID)]["status"].strip()
@@ -319,9 +325,7 @@ if __name__ == "__main__":
     print("Starting TESTING")
     TESTING(dfTotal, locationfolder, port, controllerfolder)
     time.sleep(30) # wait for results to be saved
-
-  #TODO: fix analysis part and reactivte it
-  exit()
+    
   outList = list()
   analysisCSVPath = os.path.join(outputDir, "analysis.csv")
   zipResultFolder = os.path.join(locationfolder, "tests", "output")
@@ -372,7 +376,7 @@ if __name__ == "__main__":
 
   # get headers, eliminate errorous runs
   err_ind = list()
-  headers = outList[0].keys()
+  headers = list(outList[0].keys())
 
   if os.path.exists(analysisCSVPath):
     raise Exception("analysis.csv already exists")
@@ -400,6 +404,12 @@ if __name__ == "__main__":
     for idx, outDict in enumerate(outList):
       if idx not in err_ind:
         for key in headers[:-1]:
-          csvOut.write(str(outDict[key]) + ",")
-        csvOut.write(str(outDict[headers[-1]]) + "\n") #write last key
+          if key in outDict:
+            csvOut.write(str(outDict[key]) + ",")
+          else:
+            csvOut.write(",")
+        if key in outDict:
+          csvOut.write(str(outDict[headers[-1]]) + "\n") #write last key
+        else:
+          csvOut.write("\n")
 
