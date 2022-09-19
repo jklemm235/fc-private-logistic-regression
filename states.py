@@ -217,6 +217,7 @@ class obtainWeights(AppState):
         DPSGD_class = self.load("DPSGD_class")
         DPSGD_class.theta = np.array(self.await_data(n = 1, unwrap=True,
                                                      is_json=False))
+        print("Obtained weights: {}".format(DPSGD_class.theta)) #TODO: rmv
         self.store(key="DPSGD_class", value = DPSGD_class)
         return "local_computation"
 
@@ -241,6 +242,8 @@ class localComputationState(AppState):
         print(DPSGD_class.theta)
         print("DPSGD_class used for training:")
         print(vars(DPSGD_class))
+        print("datatype theta:")
+        print(type(DPSGD_class.theta))
 
 
         # save theta of each client
@@ -256,6 +259,8 @@ class localComputationState(AppState):
 
         # local update
         if self.is_coordinator:
+            print("Sending data to coordinator")
+            print("use_dp = {}".format(self.load("dpClient"))) #TODO: rmv
             self.send_data_to_coordinator(DPSGD_class.theta,
                                           send_to_self = True,
                                           use_smpc = False,

@@ -57,9 +57,9 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
     print("Running test number clients:")
     # Warning, for iris, don't use more than 12 clients, the dataset is too
     # small
-    testNumClients = [1,3,5,7]
-    testComRounds = [1, 5, 10, 15]
-    testEpsilon = [0.01, 0.1, 0.4, 0.8, 3.0]
+    testNumClients = [2,5,7] #TODO: add 1 client back again, add 3 clients again, remove  2clients
+    testComRounds = [5, 10, 15] #TODO: add 1 com round back again
+    testEpsilon = [15.0]#[0.01, 0.1, 0.4, 0.8, 3.0] #TODO: add back in again
     config_running = config_base.copy()
     config_running["dpOptions"]["delta"] = 0 # to use laplace noise
     for numClients in testNumClients:
@@ -74,6 +74,7 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
                               locationfolder, port, controllerfolder,
                               numClients = numClients,
                               dataDistribution = None, resetClientDirs = True)
+          exit() #TODO: rmv, do all tests again
     print("______________________________________________________")
 
   return None
@@ -102,7 +103,7 @@ def fold_generator(df):
 def run_test(configDict, dfTrain, dfTest, locationfolder, port,
              controllerfolder, numClients,
              dataDistribution = None, resetClientDirs = True,
-             num_redos = 5):
+             num_redos = 1): #TODO: num_redos back to 5
   print("Running a test")
 
   if not resetClientDirs:
@@ -148,7 +149,7 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
         # all data iterated
         break
 
-    # fill directories with test_data
+    # fill directories with test_dataw
     # create splits
     chunk_size = int(dfTest.shape[0] / numClients)
     curClient = 0
@@ -176,7 +177,7 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
                        generic_dir = "./",
                        app_image = "fc-private-logistic-regression",
                        channel = 'local',
-                       query_interval = 7,
+                       query_interval = 2,
                        download_results = "./output")
     except Exception as err:
       print("ERROR occured: {}".format(str(err)))
@@ -294,7 +295,8 @@ if __name__ == "__main__":
 
   locationfolder = args.location[0]
   controllerfolder = args.controller[0]
-  if os.path.basename(locationfolder) != "data":
+  if os.path.basename(locationfolder) != "data" and \
+     os.path.basename(locationfolder) != ("data" + os.path.sep):
     print("ERROR: locationfolder must end with data")
     exit()
   port = args.port[0]
