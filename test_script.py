@@ -52,14 +52,35 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
     curFold += 1
     config_base.update(foldInfoDict)
     print(f"Starting Fold {curFold}")
-    
-    # TEST number clients
+
+
+    # TEST lambda_
+    testNumClients = [1, 3, 5]
+    testComRounds = [1, 5]
+    testLambda = [0.001, 0.01, 0.05, 0.1, 0.5, 1]
+    epsilon = 60.0
+    config_running = config_base.copy()
+    config_running["dpOptions"]["delta"] = 0 # to use laplace noise
+    config_running["dpOptions"]["epsilon"] = epsilon
+    for numClients in testNumClients:
+      print("Num Clients: {}".format(numClients))
+      for com_rounds in testComRounds:
+        print("Com_rounds: {}".format(com_rounds))
+        for lambda_ in testLambda:
+          config_running["sgdOptions"]["lambda_"]
+          run_test(config_running, dfTrain, dfTest,
+                              locationfolder, port, controllerfolder,
+                              numClients = numClients,
+                              dataDistribution = None, resetClientDirs = True)
+    continue #TODO: remove
+
+    # TEST hyper parameters tuned
     print("Running test number clients:")
     # Warning, for iris, don't use more than 12 clients, the dataset is too
     # small
-    testNumClients = [2,5,7] #TODO: add 1 client back again, add 3 clients again, remove  2clients
-    testComRounds = [5, 10, 15] #TODO: add 1 com round back again
-    testEpsilon = [15.0]#[0.01, 0.1, 0.4, 0.8, 3.0] #TODO: add back in again
+    testNumClients = [1, 3, 5, 7]
+    testComRounds = [1, 10]
+    testEpsilon = [100.0, 50.0, 20.0, 1.0]
     config_running = config_base.copy()
     config_running["dpOptions"]["delta"] = 0 # to use laplace noise
     for numClients in testNumClients:
@@ -74,7 +95,6 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
                               locationfolder, port, controllerfolder,
                               numClients = numClients,
                               dataDistribution = None, resetClientDirs = True)
-          exit() #TODO: rmv, do all tests again
     print("______________________________________________________")
 
   return None
@@ -149,22 +169,9 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
         # all data iterated
         break
 
-    # fill directories with test_dataw
-    # create splits
-    chunk_size = int(dfTest.shape[0] / numClients)
-    curClient = 0
-    for start in range(0, dfTest.shape[0], chunk_size):
-      if curClient == numClients-1:
-        # use all remaining data
-        df_subset = dfTest.iloc[start:]
-      else:
-        df_subset = dfTest.iloc[start:start + chunk_size]
-      # write split in corresponding folder
-      df_subset.to_csv(os.path.join(locationfolder, "client" + str(curClient), "test_set.csv"), index=False)
-      curClient += 1
-      if curClient == numClients:
-        # all data iterated
-        break
+    # fill directory with test_data
+    dfTest.to_csv(os.path.join(locationfolder, "client0", "test_set.csv"),
+                     index=False)
 
 
   # Start test
@@ -177,7 +184,7 @@ def run_test(configDict, dfTrain, dfTest, locationfolder, port,
                        generic_dir = "./",
                        app_image = "fc-private-logistic-regression",
                        channel = 'local',
-                       query_interval = 2,
+                       query_interval = 1,
                        download_results = "./output")
     except Exception as err:
       print("ERROR occured: {}".format(str(err)))

@@ -325,7 +325,8 @@ class aggregateDataState(AppState):
             config["conf_matrix"] = confMat.tolist()
             config["status"] = "finished"
 
-
+            print("final config:")
+            print(config)
             # overwrite config file output
             fp = open(os.path.join("mnt", "output", "config.yaml"), "w")
             yaml.dump(config, fp)
