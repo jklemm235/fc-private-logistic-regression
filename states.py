@@ -105,27 +105,25 @@ class InitialState(AppState):
                                            "input","training_set.csv")):
             self.log("Could not find training_set.csv containing training data",
                         level = LogLevel.FATAL)
-        if not os.path.exists(os.path.join(os.getcwd(), "mnt",
+        if self.is_coordinator:
+            if not os.path.exists(os.path.join(os.getcwd(), "mnt",
                                            "input","test_set.csv")):
-            self.log("Could not find training_set.csv containing test data",
+                self.log("Could not find training_set.csv containing test data",
                         level = LogLevel.FATAL)
+            test_data = pd.read_csv(os.path.join(os.getcwd(),
+                                                "mnt", "input","test_set.csv"))
+            X_test = np.array(test_data.drop(columns=[labelCol]))
+            y_test = np.array(test_data[labelCol])
+            self.store(key = "X_test", value = X_test)
+            self.store(key = "y_test", value = y_test)
 
         # load in data
         train_data = pd.read_csv(os.path.join(os.getcwd(),
                                             "mnt", "input","training_set.csv"))
-        test_data = pd.read_csv(os.path.join(os.getcwd(),
-                                            "mnt", "input","test_set.csv"))
-
         # preprocess data
         X_train = np.array(train_data.drop(columns=[labelCol]))
         X = np.array(X_train)
         y_train = np.array(train_data[labelCol])
-
-        X_test = np.array(test_data.drop(columns=[labelCol]))
-        y_test = np.array(test_data[labelCol])
-
-        self.store(key = "X_test", value = X_test)
-        self.store(key = "y_test", value = y_test)
 
         # load in weights and other parameters
         n, d = X.shape
