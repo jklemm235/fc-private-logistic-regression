@@ -7,6 +7,11 @@ import algo
 baseFolder = "output"
 labelCol = "target"
 df = pd.read_csv(os.path.join(baseFolder, "analysis.csv"))
+# this drop is necessary as these entries are ambiguis
+df = df.drop(df[(df["C"] == 1) & (df["max_iter"] == 2500) & \
+    (df["lambda_"] == 0.05) & (df["epsilon"] == 30) & \
+    (df["numClients"] == 5) & (df["communication_rounds"] == 1)].index)
+
 dataDf = pd.read_csv(os.path.join("dataIris", "data.csv"))
 
 
