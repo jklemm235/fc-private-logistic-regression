@@ -93,6 +93,7 @@ class InitialState(AppState):
             DPSGD_class.epsilon = config["dpOptions"]["epsilon"]
             DPSGD_class.delta = config["dpOptions"]["delta"]
             labelCol = config["labelColumn"]
+            clippingVal = config["dpOptions"]["C"]
         except Exception as err:
             print("config seems to miss lines: {}".format(str(err)))
             self.log(f"Config file seems to miss fields: {str(err)}",
@@ -182,7 +183,7 @@ class InitialState(AppState):
                 self.configure_dp(epsilon = epsilon,
                                 delta =  delta,
                                 sensitivity = sensitivity,
-                                clippingVal = None,
+                                clippingVal = clippingVal,
                                 noisetype = noisetype)
         self.store(key = "dpClient", value = dpClient)
 
@@ -259,6 +260,9 @@ class localComputationState(AppState):
         if self.is_coordinator:
             print("Sending data to coordinator")
             print("use_dp = {}".format(self.load("dpClient"))) #TODO: rmv
+            while len(self._app.data_outgoing) > 0:
+                # still data to be sent, wait for that to be sent
+                time.sleep(1)
             self.send_data_to_coordinator(DPSGD_class.theta,
                                           send_to_self = True,
                                           use_smpc = False,

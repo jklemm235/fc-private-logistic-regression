@@ -1,5 +1,5 @@
 sgdOptions:
-    alpha: 0.01 # learning rate
+    alpha: 0.1 # learning rate
     max_iter  : 1 # number of iterations for the local SGD per communication rounds
     lambda_: 0.5 # Regularization parameter lambda
     tolerance: 0.000005

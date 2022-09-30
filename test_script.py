@@ -33,7 +33,7 @@ config_base = {"sgdOptions":
                 "dpOptions":
                   {"epsilon":  0.1,
                    "delta":  None,
-                   "C": 1}
+                   "C": None}
                 }
 
 numClientsDefault = 3 # default number of clients
@@ -61,6 +61,7 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
     testComRounds = [1]
     testEpsilon = [30.0]
     testLambda = [0.05]
+    testClipping = [0.01, 0.1, 0.5, 1] # DO NOT USE 1 FOR C, THAT HAS BEEN SET UNTIL NOW
     config_running = config_base.copy()
     config_running["dpOptions"]["delta"] = 0 # to use laplace noise
     config_running["sgdOptions"]["max_iter"] = 2500 
