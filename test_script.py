@@ -53,36 +53,18 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
     config_base.update(foldInfoDict)
     print(f"Starting Fold {curFold}")
 
-
-    # TEST lambda_
-    testNumClients = [1, 3, 5]
-    testComRounds = [1, 5]
-    testLambda = [0.001, 0.01, 0.05, 0.1, 0.5, 1]
-    epsilon = 60.0
-    config_running = config_base.copy()
-    config_running["dpOptions"]["delta"] = 0 # to use laplace noise
-    config_running["dpOptions"]["epsilon"] = epsilon
-    for numClients in testNumClients:
-      print("Num Clients: {}".format(numClients))
-      for com_rounds in testComRounds:
-        print("Com_rounds: {}".format(com_rounds))
-        for lambda_ in testLambda:
-          config_running["sgdOptions"]["lambda_"]
-          run_test(config_running, dfTrain, dfTest,
-                              locationfolder, port, controllerfolder,
-                              numClients = numClients,
-                              dataDistribution = None, resetClientDirs = True)
-    continue #TODO: remove
-
     # TEST hyper parameters tuned
     print("Running test number clients:")
     # Warning, for iris, don't use more than 12 clients, the dataset is too
     # small
-    testNumClients = [1, 3, 5, 7]
-    testComRounds = [1, 10]
-    testEpsilon = [100.0, 50.0, 20.0, 1.0]
+    testNumClients = [5]
+    testComRounds = [1]
+    testEpsilon = [30.0]
+    testLambda = [0.05]
     config_running = config_base.copy()
     config_running["dpOptions"]["delta"] = 0 # to use laplace noise
+    config_running["sgdOptions"]["max_iter"] = 2500 
+    print("max_iter is {}".format(config_running["sgdOptions"]["max_iter"]))
     for numClients in testNumClients:
       print("Num Clients: {}".format(numClients))
       for com_rounds in testComRounds:
@@ -91,7 +73,10 @@ def TESTING(dfTotal, locationfolder, port, controllerfolder):
         for epsilon in testEpsilon:
           print("Epsilon: {}".format(epsilon))
           config_running["dpOptions"]["epsilon"] = epsilon
-          run_test(config_running, dfTrain, dfTest,
+          for lambda_ in testLambda:
+            config_running["sgdOptions"]["lambda_"] = lambda_
+            print("lambda_ is {}".format(lambda_))
+            run_test(config_running, dfTrain, dfTest,
                               locationfolder, port, controllerfolder,
                               numClients = numClients,
                               dataDistribution = None, resetClientDirs = True)
@@ -123,7 +108,7 @@ def fold_generator(df):
 def run_test(configDict, dfTrain, dfTest, locationfolder, port,
              controllerfolder, numClients,
              dataDistribution = None, resetClientDirs = True,
-             num_redos = 1): #TODO: num_redos back to 5
+             num_redos = 5): #TODO: num_redos back to 5
   print("Running a test")
 
   if not resetClientDirs:
@@ -332,7 +317,8 @@ if __name__ == "__main__":
     print("Starting TESTING")
     TESTING(dfTotal, locationfolder, port, controllerfolder)
     time.sleep(30) # wait for results to be saved
-    
+    exit()
+
   outList = list()
   analysisCSVPath = os.path.join(outputDir, "analysis.csv")
   zipResultFolder = os.path.join(locationfolder, "tests", "output")
