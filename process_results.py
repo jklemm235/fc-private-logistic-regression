@@ -43,6 +43,7 @@ for idx, baseRow in enumerate(dictList):
     # correction of base original Row
     model = np.load(os.path.join(model_folder, "trained_model.pyc"))
     DPSGD_class.theta = model
+    dictList[idx]["communication_rounds"] = str(numComRounds) + "_" + str(numComRounds)
     dictList[idx]["accuracy"], _ = DPSGD_class.evaluate(x_test, y)
 
 # concat dictList and dictListNewRows
