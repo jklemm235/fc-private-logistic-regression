@@ -38,7 +38,7 @@ for idx, baseRow in enumerate(dictList):
                                      "aggmodel_{}.pyc".format(curComRound)))
         DPSGD_class.theta = model
         newRow["accuracy"], _ = DPSGD_class.evaluate(x_test, y)
-        newRow["communication_rounds"] = curComRound
+        newRow["communication_rounds"] = str(curComRound) + "_" + str(numComRounds)
         dictListNewRows.append(newRow)
     # correction of base original Row
     model = np.load(os.path.join(model_folder, "trained_model.pyc"))
