@@ -1,17 +1,19 @@
 sgdOptions:
-    alpha: 0.01 # learning rate
-    max_iter  : 10 # number of iterations for the local SGD per communication rounds
-    lambda_: 0.5 # Regularization parameter lambda
-    tolerance: 0.000005
+    alpha: 0.1 # learning rate
+    max_iter  : 500 # number of iterations for the local SGD per communication rounds
+    lambda_: 0.01 # Regularization parameter lambda
+    tolerance: 0.00001
     L: 0.1 #Lot size in DPSGD
 
 
-labelColumn: "Chance"
-communication_rounds: 2 # number of times the local models get aggregated and then broadcasted
-dpMode: # list, different modes: dpSgd, dpClient, dpCoordinator or null for no dp at all
-            # all modes can be combined with each other other
-        - "dpSgd"
+labelColumn: null
+communication_rounds: 5 # number of times the local models get aggregated and then broadcasted
+dpMode: # list, different modes:
+        #   dpSgd - applies the DP-SGD algorithm
+        #   dpClient - applies DP to models sent by clients to the coordinator
+        #   null - no dp at all
+        - null
 dpOptions:
     epsilon: 0.9
-    delta: 0.000001 # if 0 laplace noise, else gauss noise
+    delta: 0.0 # if 0 laplace noise, else gauss noise
     C: 1 # norm bound
